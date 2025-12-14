@@ -43,7 +43,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const { data, error } = await this.supabase
       .from('auth')
-      .insert([{ email: signUpDto.email, password: hashedPassword, roles: 'USER' }])
+      .insert([{ email: signUpDto.email, password: hashedPassword }])
       .select()
       .single();
 
@@ -58,7 +58,7 @@ export class AuthService {
 
     const { error: userInsertError } = await this.supabase
       .from('users')
-      .insert([{ id: data.userId }]);
+      .insert([{ id: data.userId, roles: 'USER'}]);
 
     if (userInsertError) {
       throw new BadRequestException('Không thể tạo hồ sơ người dùng: ' + userInsertError.message);
