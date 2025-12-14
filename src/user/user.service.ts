@@ -36,7 +36,7 @@ export class UserService {
       if (error) {
         throw new Error(error.message);
       }
-      return { message: 'Sos request cancelled successfully'};
+      return { message: 'hủy yêu cầu sos thành công' };
     }
 
     async completeSosRequest(sosId: string, user: any) {
@@ -51,7 +51,7 @@ export class UserService {
       if (error) {
         throw new Error(error.message);
       }
-      return { message: 'Sos request completed successfully'};
+      return { message: 'đánh dấu hoàn thành yêu cầu sos thành công' };
     }
     async viewMyProfile(user: any) {
       const userId = user.id;
@@ -65,6 +65,28 @@ export class UserService {
       }
       return data;
     }
+    async updateProfile(user: any, updateProfileDto: any,avatarFile?: Express.Multer.File) {
+      const userId = user.id;
+      console.log('userId:', userId);
+      const avatarUrl =avatarFile ? await this.cloudinaryService.uploadDocument(avatarFile) : null;
+      const updateData: any = { ...updateProfileDto };
+      if (avatarUrl) {
+        updateData.avatar = avatarUrl;
+      }
+      
+      console.log('Update Data:', updateData);
+      const { data, error } = await this.supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', userId)
+        .select()
+        .single();
+      if (error) {
+        throw new Error(error.message);
+      }
+      return data;
+    }
+
 
 
 }

@@ -28,7 +28,7 @@ export class SosService {
       throw new Error(error.message);
     }
     return{
-      message: 'SOS request created successfully',
+      message: 'SOS request khởi tạo thành công',
       data,
     }
   

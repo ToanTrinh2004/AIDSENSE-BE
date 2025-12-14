@@ -24,7 +24,7 @@ export class TeamService {
       .select()
       .single();
       return{
-        message: 'Team created successfully',
+        message: 'thành công tạo đội cứu trợ',
         data,
       }
   }
@@ -42,7 +42,7 @@ export class TeamService {
       .single();
   
     return {
-      message: 'Support request accepted',
+      message: 'cứu trợ đuợc chấp nhận',
       data,
     };
   }
@@ -61,7 +61,7 @@ export class TeamService {
       .single();
   
     return {
-      message: 'Support request cancelled',
+      message: 'hộ trợ bị hủy bỏ',
       data,
     };
   }
@@ -80,7 +80,7 @@ export class TeamService {
       .single();
   
     return {
-      message: 'Support request completed',
+      message: 'hỗ trợ hoàn thành',
       data,
     };
   }
@@ -126,7 +126,7 @@ export class TeamService {
       .eq('leader_id', teamId)
       .single();
     if (error || !data) {
-      throw new Error('Team not found');
+      throw new Error('không tìm thấy đội cứu trợ');
     }
     return data;
   }

@@ -10,6 +10,8 @@ import { jwtConstants } from './auth/constant';
 import { CloudinaryService } from './cloudinary/cloudinary.service';
 import { UserModule } from './user/user.module';
 import { TeamModule } from './team/team.module';
+import { EventsModule } from './events/events.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -21,7 +23,9 @@ import { TeamModule } from './team/team.module';
     signOptions: { expiresIn: '1d' },
   }),
   UserModule,
-  TeamModule,],
+  TeamModule,
+  EventsModule,
+  AdminModule,],
 
   controllers: [AppController],
   providers: [AppService,CloudinaryService],

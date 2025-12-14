@@ -24,13 +24,13 @@ export class AuthController {
   }
   @HttpCode(200)
   @Post('email/otp')
-  async verifyOtp(@Body() body: { email: string; otp: string }) {
+  async verifyOtp(@Body() body: { email: string; otp: number }) {
     return this.authService.verifyOtp(body.email, body.otp);
   }
  
   @HttpCode(200)
   @Patch('forget-password')
-  async forgetPassword(@Body() body: { email: string; newPassword: string; otp: string }) {
-    return this.authService.forgotPassword(body.email, body.newPassword, body.otp);
+  async forgetPassword(@Body() body: { email: string; password: string; confirmPassword:string; otp: number }) {
+    return this.authService.forgotPassword(body.email, body.password,body.confirmPassword, body.otp);
   }
 }
