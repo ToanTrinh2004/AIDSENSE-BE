@@ -37,23 +37,9 @@ export class EventsService {
     console.log("DTO received in service:", dto);
 
     try {
-      /** 1️ Call API Chính Phủ */
-      const govRes = await axios.post(
-        'https://api.thongtincuuho.org/api/events/find',
-        dto,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'PostmanRuntime/7.49.1',
-            'Accept': '*/*',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Cookie': '__cf_bm=1AuwiZ4wMq_d6GQLs_qC9SW....', // <-- copy từ Postman
-          },
-        },
-      );
+     
 
-      const govEvents = govRes.data?.data?.events || [];
+      const govEvents =  [];
       console.log("Government events fetched:", govEvents);
 
       /** 2️ Query SOS nội bộ */
