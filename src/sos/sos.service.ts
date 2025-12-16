@@ -32,7 +32,26 @@ export class SosService {
       data,
     }
   
+  } 
+  async sosRequestWithoutUser(createSosDto: CreateSosDto, file: Express.Multer.File) {
+    const imageUrl = file ? await this.cloudinaryService.uploadBufferFile(file) : null;
+    const { data, error } = await this.supabase
+      .from('sos_request')
+      .insert([{
+        ...createSosDto,
+        image: imageUrl,
+      }])
+      .select()
+      .single();
+    if (error) {
+      throw new Error(error.message);
+    }
+    return{
+      message: 'SOS request khởi tạo thành công',
+      data,
+    }
   }
+  
   async findAllSosRequests() {
     const { data, error } = await this.supabase
       .from('sos_request')

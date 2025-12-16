@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, UseGuards, UseInterceptors, UploadedFile, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, UseGuards, UseInterceptors, UploadedFile, Req, Query } from '@nestjs/common';
 import { TeamService } from './team.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
@@ -54,8 +54,8 @@ export class TeamController {
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Get('all-support')
-  async getAllTeams(@Req() req) {
-    return this.teamService.getSosByTeam(req.user);
+  async getAllTeams(@Req() req,@Query('status') status: string) {
+    return this.teamService.getSosByTeam(req.user,status);
   }
   
 }

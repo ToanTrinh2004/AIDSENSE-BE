@@ -25,6 +25,14 @@ async findAllSosRequests() {
   return this.sosService.findAllSosRequests();
 
 }
+@Post('request-no-auth')
+@UseInterceptors(FileInterceptor('image'))
+async requestSosWithOutAuth(
+@Body() createSosDto: CreateSosDto,
+@UploadedFile() file: Express.Multer.File,
+) {
+return this.sosService.sosRequestWithoutUser(createSosDto, file);
+}
 
 
 

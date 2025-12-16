@@ -36,7 +36,7 @@ export class UserService {
       if (error) {
         throw new Error(error.message);
       }
-      return { message: 'hủy yêu cầu sos thành công' };
+      return { message: 'Hủy yêu cầu sos thành công' };
     }
 
     async completeSosRequest(sosId: string, user: any) {
@@ -51,7 +51,7 @@ export class UserService {
       if (error) {
         throw new Error(error.message);
       }
-      return { message: 'đánh dấu hoàn thành yêu cầu sos thành công' };
+      return { message: 'Đánh dấu hoàn thành yêu cầu sos thành công' };
     }
     async viewMyProfile(user: any) {
       const userId = user.id;

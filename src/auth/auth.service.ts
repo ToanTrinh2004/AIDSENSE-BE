@@ -203,4 +203,23 @@ export class AuthService {
       throw new BadRequestException('Xác thực OTP thất bại.');
     }
   }
+  async sendOtpToTeamLeader(email: string) {
+    const otp = this.generateOtp();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    const { data, error } = await this.supabase
+      .from('team_leader_otps')
+      .upsert({
+        email: email,
+        otp: otp,
+        expires_at: expiresAt,
+      });
+    if (error) {
+      throw new BadRequestException('Không thể lưu OTP.');
+    }
+    await this.emailService.sendOtpToTeamLeader(email, otp);
+    return {
+      success: true,
+      message: 'OTP đã được gửi đến email.',
+    };
+  }
 }
