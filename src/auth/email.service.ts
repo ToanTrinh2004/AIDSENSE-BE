@@ -55,12 +55,55 @@ export class EmailService {
     await this.transporter.sendMail({
       from: `"AID SENSE" <${process.env.MAIL_USER}>`,
       to,
-      subject: 'Team Leader OTP Code',
+      subject: 'Xác nhận thành lập Đội Cứu Hộ - Mã OTP',
       html: `
-        <h2>Your Team Leader OTP Code</h2>
-        <p style="font-size: 22px; font-weight: bold;">${otp}</p>
-        <p>This OTP will expire in 5 minutes.</p>
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <h2 style="color: #1a73e8;">Xác nhận thành lập đội cứu hộ</h2>
+  
+          <p>Xin chào,</p>
+  
+          <p>
+            Đây là thư xác nhận việc <strong>thành lập đội cứu hộ</strong> của bạn trên hệ thống 
+            <strong>AID SENSE</strong>.
+          </p>
+  
+          <p>
+            Để hoàn tất quá trình xác minh và kích hoạt vai trò 
+            <strong>Trưởng nhóm cứu hộ</strong>, vui lòng sử dụng mã OTP dưới đây:
+          </p>
+  
+          <p style="
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #d93025;
+            margin: 16px 0;
+          ">
+            ${otp}
+          </p>
+  
+          <p>
+            Mã OTP này có hiệu lực trong <strong>5 phút</strong>. 
+            Vui lòng không chia sẻ mã này cho bất kỳ ai để đảm bảo an toàn tài khoản.
+          </p>
+  
+          <p>
+            Nếu bạn không thực hiện yêu cầu thành lập đội cứu hộ, 
+            vui lòng bỏ qua email này hoặc liên hệ với bộ phận hỗ trợ của chúng tôi.
+          </p>
+  
+          <hr style="margin: 24px 0;" />
+  
+          <p>
+            Chào mừng bạn đến với <strong>AID SENSE</strong> –  
+            nền tảng hỗ trợ kết nối và điều phối cứu hộ nhanh chóng, chính xác và hiệu quả.
+          </p>
+  
+          <p>Trân trọng,<br/>
+          <strong>Đội ngũ AID SENSE</strong></p>
+        </div>
       `,
     });
   }
+  
 }

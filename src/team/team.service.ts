@@ -3,12 +3,14 @@ import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import Redis from 'ioredis';
 
 @Injectable()
 export class TeamService {
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly cloudinaryService: CloudinaryService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis
   ) {}
 
   async createTeam(createTeamDto: CreateTeamDto, file: Express.Multer.File, user: any) {

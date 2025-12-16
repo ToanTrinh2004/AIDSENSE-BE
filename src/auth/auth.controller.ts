@@ -33,4 +33,17 @@ export class AuthController {
   async forgetPassword(@Body() body: { email: string; password: string; confirmPassword:string; otp: number }) {
     return this.authService.forgotPassword(body.email, body.password,body.confirmPassword, body.otp);
   }
+  @HttpCode(200)
+  @Post('team/otp')
+  async sendOtpToTeamLeader(@Body('email') email: string) {
+    return this.authService.sendOtpToTeamLeader(email);
+  }
+  @HttpCode(200)
+  @Post('team/verify')
+  async verifyOtpForTeamLeader(
+    @Body('email') email: string,
+    @Body('otp') otp: number,
+  ) {
+    return this.authService.verifyOtpForTeamLeader(email, otp);
+  }
 }

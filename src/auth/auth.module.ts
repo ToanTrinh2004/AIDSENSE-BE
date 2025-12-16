@@ -4,12 +4,13 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { jwtConstants } from './constant';
 import { EmailService } from './email.service';
+import { RedisProvider } from 'src/RedisService';
 
 @Module({
   imports: [
     
   ],
   controllers: [AuthController],
-  providers: [AuthService,EmailService],
+  providers: [AuthService,EmailService,RedisProvider],
 })
 export class AuthModule {}

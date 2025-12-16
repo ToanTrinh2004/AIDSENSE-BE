@@ -12,6 +12,7 @@ import { UserModule } from './user/user.module';
 import { TeamModule } from './team/team.module';
 import { EventsModule } from './events/events.module';
 import { AdminModule } from './admin/admin.module';
+import { RedisProvider } from './RedisService';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -28,6 +29,6 @@ import { AdminModule } from './admin/admin.module';
   AdminModule,],
 
   controllers: [AppController],
-  providers: [AppService,CloudinaryService],
+  providers: [AppService,CloudinaryService,RedisProvider],
 })
 export class AppModule { }

@@ -8,6 +8,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { jwtConstants } from './constant';
 import { SignInDto } from './dto/sign-in.dto';
 import { EmailService } from './email.service';
+import Redis from 'ioredis';
 
 @Injectable()
 export class AuthService {
@@ -15,6 +16,7 @@ export class AuthService {
     private jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private emailService: EmailService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis
   ) {}
 
   private generateOtp() {
@@ -204,22 +206,46 @@ export class AuthService {
     }
   }
   async sendOtpToTeamLeader(email: string) {
-    const otp = this.generateOtp();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-    const { data, error } = await this.supabase
-      .from('team_leader_otps')
-      .upsert({
-        email: email,
-        otp: otp,
-        expires_at: expiresAt,
-      });
-    if (error) {
-      throw new BadRequestException('Không thể lưu OTP.');
+    const otp = this.generateOtp(); // Generate a 6-digit OTP
+    const expiresInSeconds = 5 * 60; // OTP expiration time (5 minutes)
+  
+    try {
+      // Store the OTP in Redis with an expiration time
+      await this.redis.set(`team_leader_otp:${email}`, otp, 'EX', expiresInSeconds);
+  
+      // Send the OTP to the team leader's email
+      await this.emailService.sendOtpToTeamLeader(email, otp);
+  
+      return {
+        success: true,
+        message: 'OTP đã được gửi đến email.',
+      };
+    } catch (error) {
+      console.error('Error sending OTP to team leader:', error);
+      throw new BadRequestException('Không thể gửi OTP.');
     }
-    await this.emailService.sendOtpToTeamLeader(email, otp);
-    return {
-      success: true,
-      message: 'OTP đã được gửi đến email.',
-    };
+  }
+  async verifyOtpForTeamLeader(email: string, otp: number) {
+    try {
+      // Retrieve the OTP from Redis
+      const storedOtp = await this.redis.get(`team_leader_otp:${email}`);
+  
+      if (!storedOtp) {
+        throw new BadRequestException('OTP đã hết hạn hoặc không tồn tại.');
+      }
+  
+      if (storedOtp !== String(otp)) {
+        throw new BadRequestException('OTP không hợp lệ.');
+      }
+  
+      // OTP is valid, you can now proceed with the next steps
+      return {
+        success: true,
+        message: 'Xác thực OTP thành công.',
+      };
+    } catch (error) {
+      console.error('Error verifying OTP for team leader:', error);
+      throw new BadRequestException('Không thể xác thực OTP.');
+    }
   }
 }
