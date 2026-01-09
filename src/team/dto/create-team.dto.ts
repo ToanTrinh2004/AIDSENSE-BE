@@ -25,21 +25,15 @@ export class CreateTeamDto {
   leader?: string;
 
   @IsOptional()
-  @IsPhoneNumber('VN')
   phone?: string;
 
   @IsOptional()
   @IsString()
   position?: string;
 
-  // default PENDING → không để client gửi lên
-  @IsOptional()
-  @IsIn(['PENDING', 'APPROVED', 'REJECTED'])
-  team_status?: string;
+  
 
 
 
-  // leader phải là user trong bảng users
-  @IsUUID()
-  leader_id: string;
+
 }

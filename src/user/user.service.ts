@@ -14,9 +14,16 @@ export class UserService {
     async viewMySosRequests(user: any) {
       const userId = user.id;
       const { data, error } = await this.supabase
-        .from('sos_request')
-        .select('*')
-        .eq('userid', userId);
+    .from('sos_request')
+    .select(`
+      *,
+      team_rescue (
+        name,
+        leader,
+        phone
+      )
+    `)
+    .eq('userid', userId);
       if (error) {
         throw new Error(error.message);
       }

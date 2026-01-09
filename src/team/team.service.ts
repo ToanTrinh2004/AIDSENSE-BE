@@ -1,4 +1,4 @@
-import { Inject, Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Inject, Injectable, HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { UpdateTeamDto } from './dto/update-team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -13,41 +13,77 @@ export class TeamService {
     @Inject('REDIS_CLIENT') private readonly redis: Redis
   ) {}
 
-  async createTeam(createTeamDto: CreateTeamDto, file: Express.Multer.File, user: any) {
-    const documentsUrl = file ? await this.cloudinaryService.uploadDocument(file) : null;
+  async createTeam(
+    createTeamDto: CreateTeamDto,
+    file: Express.Multer.File,
+    user: any
+  ) {
+    const documentsUrl = file
+      ? await this.cloudinaryService.uploadDocument(file)
+      : null;
+  
     const userId = user.id;
-
+  
     try {
-      // Insert team data
+      // 1️⃣ Check existing pending team by leader
+      const { data: existingTeam, error: checkError } = await this.supabase
+        .from('team_rescue')
+        .select('id, team_status')
+        .eq('leader_id', userId)
+        .eq('team_status', 'PENDING')
+        .maybeSingle();
+  
+      if (checkError) {
+        throw new HttpException(
+          checkError.message,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+  
+      if (existingTeam) {
+        throw new HttpException(
+          'Bạn đã đăng ký đội cứu hộ và đang chờ Admin xét duyệt.',
+          HttpStatus.CONFLICT,
+        );
+      }
+  
+      // 2️⃣ Upload + insert team
       const { data: teamData, error: teamError } = await this.supabase
         .from('team_rescue')
         .insert([{
           ...createTeamDto,
           document_url: documentsUrl,
           leader_id: userId,
+          team_status: 'PENDING',
         }])
         .select()
         .single();
-
+  
       if (teamError) {
-        throw new HttpException(teamError.message, HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          teamError.message,
+          HttpStatus.BAD_REQUEST,
+        );
       }
-
-      // Update user role
-      const { data: userUpdateData, error: userUpdateError } = await this.supabase
+  
+      // 3️⃣ Update user role
+      const { error: userUpdateError } = await this.supabase
         .from('users')
-        .update({ roles: 'TEAM_LEADER',team_id:teamData.id })
+        .update({
+          roles: 'TEAM_LEADER',
+          team_id: teamData.id,
+        })
         .eq('id', userId);
-
+  
       if (userUpdateError) {
         throw new HttpException(
           `Không thể cập nhật vai trò người dùng: ${userUpdateError.message}`,
           HttpStatus.BAD_REQUEST,
         );
       }
-
+  
       return {
-        message: 'Thành công tạo đội cứu trợ',
+        message: 'Thành công tạo đội cứu trợ, vui lòng chờ Admin xét duyệt.',
         data: teamData,
       };
     } catch (error) {
@@ -55,7 +91,9 @@ export class TeamService {
       throw error;
     }
   }
-
+  
+  
+  
   async supporting(sosId: string, user: any) {
     const teamId = await this.validateApprovedTeam(user);
     await this.validateSosStatus(sosId, 'PENDING');
@@ -180,7 +218,7 @@ export class TeamService {
       .eq('teamId', teamId)
       .eq(status ? 'status' : '', status ? status : '');
 
-    if (error || !data) {
+    if (error ) {
       throw new HttpException('Không tìm thấy đội cứu trợ', HttpStatus.BAD_REQUEST);
     }
 

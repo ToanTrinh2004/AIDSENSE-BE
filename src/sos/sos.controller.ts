@@ -12,29 +12,34 @@ export class SosController {
   @UseGuards(AuthGuard)
   @Post('request')
   @UseInterceptors(FileInterceptor('image'))
-async requestSos(
-  @Body() createSosDto: CreateSosDto,
-  @UploadedFile() file: Express.Multer.File,
-  @Req() req
-) {
-  return this.sosService.requestSos(createSosDto, file, req.user);
-}
-@HttpCode(200)
-@Get('events/aidsense')
-async findAllSosRequests() {
-  return this.sosService.findAllSosRequests();
+  async requestSos(
+    @Body() createSosDto: CreateSosDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req
+  ) {
+    return this.sosService.requestSos(createSosDto, file, req.user);
+  }
+  @HttpCode(200)
+  @Get('events/aidsense')
+  async findAllSosRequests() {
+    return this.sosService.findAllSosRequests();
 
-}
-@Post('request-no-auth')
-@UseInterceptors(FileInterceptor('image'))
-async requestSosWithOutAuth(
-@Body() createSosDto: CreateSosDto,
-@UploadedFile() file: Express.Multer.File,
-) {
-return this.sosService.sosRequestWithoutUser(createSosDto, file);
-}
+  }
+  @Post('request-no-auth')
+  @UseInterceptors(FileInterceptor('image'))
+  async requestSosWithOutAuth(
+    @Body() createSosDto: CreateSosDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.sosService.sosRequestWithoutUser(createSosDto, file);
+  }
 
-
-
-
+  @Post('convert')
+  async convertPlace(
+    @Body('lat') lat: number,
+    @Body('lon') lon: number,
+  ) {
+    const locationName = await this.sosService.convertPlace(lat, lon);
+    return { location_name: locationName };
+  }
 }

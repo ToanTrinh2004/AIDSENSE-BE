@@ -19,8 +19,8 @@ export class AuthController {
   }
   @HttpCode(200)
   @Post('email')
-  async sendOtp(@Body('email') email: string) {
-    return this.authService.sendOtp(email);
+  async sendOtp(@Body() body:{ email: string, type: string }) {
+    return this.authService.sendOtp(body.email,body.type);
   }
   @HttpCode(200)
   @Post('email/otp')

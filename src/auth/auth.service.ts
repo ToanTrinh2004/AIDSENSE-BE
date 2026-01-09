@@ -54,13 +54,13 @@ export class AuthService {
     }
 
     const access_token = await this.jwtService.signAsync(
-      { id: data.userId, email: data.email, role: data.roles },
+      { id: data.userId, email: data.email, role: "USER" },
       { secret: jwtConstants.secret },
     );
 
     const { error: userInsertError } = await this.supabase
       .from('users')
-      .insert([{ id: data.userId, roles: 'USER'}]);
+      .insert([{ id: data.userId, roles: 'USER',username: signUpDto.username, phone: signUpDto.phone }]);
 
     if (userInsertError) {
       throw new BadRequestException('Không thể tạo hồ sơ người dùng: ' + userInsertError.message);
@@ -100,7 +100,7 @@ export class AuthService {
       }
 
       const access_token = await this.jwtService.signAsync(
-        { id: existingUser.userId, email: existingUser.email, role: existingUser.roles },
+        { id: existingUser.userId, email: existingUser.email, role: userData.roles },
         { secret: jwtConstants.secret },
       );
 
@@ -112,17 +112,20 @@ export class AuthService {
       };
     } catch (error) {
       console.error('Lỗi đăng nhập:', error);
-      throw new BadRequestException('Đã xảy ra lỗi khi đăng nhập.');
+      throw new BadRequestException('Sai tên đăng nhập hoặc mật khẩu.');
     }
   }
 
-  async sendOtp(email: string) {
+  async sendOtp(email: string, type: string) {
+    if(type === 'forgotpassword'){ 
+      const checkIsExistingUser = await this.checkIsExistingUser(email);
+      if (!checkIsExistingUser.data) {
+        throw new BadRequestException('Tài khoản chưa được đăng ký.');
+      }
+    }
     const otp = this.generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-    const checkIsExistingUser = await this.checkIsExistingUser(email);
-    if (!checkIsExistingUser.data) {
-      throw new BadRequestException('Tài khoản chưa được đăng ký.');
-    }
+    
 
     const { data, error } = await this.supabase
       .from('email_otps')
@@ -238,7 +241,7 @@ export class AuthService {
         throw new BadRequestException('OTP không hợp lệ.');
       }
   
-      // OTP is valid, you can now proceed with the next steps
+      
       return {
         success: true,
         message: 'Xác thực OTP thành công.',

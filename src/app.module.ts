@@ -13,6 +13,7 @@ import { TeamModule } from './team/team.module';
 import { EventsModule } from './events/events.module';
 import { AdminModule } from './admin/admin.module';
 import { RedisProvider } from './RedisService';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -26,7 +27,8 @@ import { RedisProvider } from './RedisService';
   UserModule,
   TeamModule,
   EventsModule,
-  AdminModule,],
+  AdminModule,
+  ChatbotModule,],
 
   controllers: [AppController],
   providers: [AppService,CloudinaryService,RedisProvider],

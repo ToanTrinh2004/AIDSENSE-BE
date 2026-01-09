@@ -54,3 +54,10 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+./sos_nlp/venv
+./sos_nlp/__pycache__
+./sos_nlp/*.pyc
+./sos_nlp/*.pyo
+./sos_nlp/*.pyd
+
