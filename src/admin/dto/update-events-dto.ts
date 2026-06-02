@@ -1,9 +1,9 @@
 import { IsOptional, IsString, IsNumber, IsEnum } from 'class-validator';
 
 export enum EventCodeType {
-  HELP = 'HELP',
+  RESCUE = 'RESCUE',
   ESSENTIAL = 'ESSENTIAL',
-  TOWING = 'TOWING',
+  MEDICAL = 'MEDICAL',
   OTHER = 'OTHER',
 }
 

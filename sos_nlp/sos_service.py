@@ -72,7 +72,7 @@ def normalize_and_classify_sos(raw_text: str) -> dict:
     - RESCUE
     - MEDICAL
     - HELP
-    - ESSENTIALS
+    - ESSENTIAL
     - OTHER
     - TOWING
 

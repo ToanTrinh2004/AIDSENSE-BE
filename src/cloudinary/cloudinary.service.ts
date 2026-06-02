@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Multer } from 'multer'; // Import Multer type explicitly
 import { v2 as cloudinary } from 'cloudinary';
 import { config } from 'dotenv';
 import * as fs from 'fs';

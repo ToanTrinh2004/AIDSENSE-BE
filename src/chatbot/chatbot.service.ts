@@ -46,14 +46,16 @@ export class ChatbotService {
 
   async embeddingText(text: string): Promise<number[]> {
     const res = await axios.post(
-      'http://localhost:1234/v1/embeddings',
+      'https://api.voyageai.com/v1/embeddings',
       {
-        model: 'text-embedding-nomic-embed-text-v1.5',
-        input: text
+        model: 'voyage-4',
+        input: [text],
+        input_type: 'document'
       },
       {
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.VOYAGE_API_KEY}`
         }
       }
     );
@@ -95,47 +97,50 @@ export class ChatbotService {
   - SOS đang xử lý (IN PROGRESS): ${sosStats.inprogress_count}
   `;
 
-    // Prompt
-    const prompt = `
-  Bạn là trợ lý AIDSENSE BOT.
-  Bạn CHỈ được trả lời bằng tiếng Việt.
-  
-  QUY TẮC:
-  - KHÔNG được bịa số liệu
-  - CHỈ sử dụng số SOS trong THÔNG TIN HỆ THỐNG
-  - Nếu không có dữ liệu → nói "Tôi chưa có thông tin này"
-  
-  ====================
-  THÔNG TIN HỆ THỐNG:
-  ${systemFacts}
-  ====================
-  
-  CONTEXT:
-  ${context}
-  ====================
-  
-  CÂU HỎI:
-  ${query}
-  `;
+    //  System prompt (authoritative rules + live stats)
+    const systemPrompt = `Bạn là trợ lý AIDSENSE BOT.
+Bạn CHỈ được trả lời bằng tiếng Việt.
+
+QUY TẮC:
+- KHÔNG được bịa số liệu
+- CHỈ sử dụng số SOS trong THÔNG TIN HỆ THỐNG
+- Nếu không có dữ liệu → nói "Tôi chưa có thông tin này"
+
+====================
+THÔNG TIN HỆ THỐNG:
+${systemFacts}
+====================`;
+
+    //  User message with RAG context injected
+    const userMessage = `CONTEXT:
+${context}
+====================
+
+CÂU HỎI:
+${query}`;
 
     const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      'https://api.anthropic.com/v1/messages',
       {
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 512
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        temperature: 0.2,
+        system: systemPrompt,
+        messages: [
+          { role: 'user', content: userMessage }
+        ]
+      },
+      {
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json'
         }
       }
     );
 
     return {
-      answer: res.data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+      answer: res.data?.content?.[0]?.text ?? ''
     };
   }
   

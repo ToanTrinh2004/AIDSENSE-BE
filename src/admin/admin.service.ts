@@ -112,18 +112,38 @@ export class AdminService {
     };
   }
   async updateUser(userId: string, updateData: UpdateUserDto) {
+   
+    const userData = {
+      username: updateData.username,
+      address: updateData.address,
+      phone: updateData.phone
+    };
+    
     const { data, error } = await this.supabase
       .from('users')
-      .update(updateData)
+      .update(userData)
       .eq('id', userId)
       .select()
       .single();
+      
     if (error) {
       throw new Error(error.message);
     }
+  
+    const { data: authData, error: authError } = await this.supabase
+      .from('auth')
+      .update({ email: updateData.email })
+      .eq('userId', userId)
+      .select()
+      .single();
+      
+    if (authError) {
+      throw new Error(authError.message);
+    }
+    
     return {
       success: true,
-      data
+      data,
     };
   }
   async updateTeamStatus(teamId: string, status: string) {
@@ -180,7 +200,7 @@ export class AdminService {
   async getAllRequestedEvents(limit: number, page: number) {
     const offset = (page - 1) * limit;
     
-    // 1️⃣ Get total count
+    //  Get total count
     const { count, error: countError } = await this.supabase
       .from('sos_request')
       .select('*', { count: 'exact', head: true })
@@ -190,7 +210,7 @@ export class AdminService {
       throw new Error(countError.message);
     }
   
-    // 2️⃣ Get data with nested joins
+    //  Get data with nested joins
     const { data, error } = await this.supabase
       .from('sos_request')
       .select(`
