@@ -1,29 +1,38 @@
-# Step 1: Build stage
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Copy package files
+# Copy manifests first (better layer caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install ALL deps (need devDeps like @nestjs/cli to build)
+RUN npm ci
 
-# Copy source code
+# Copy source
 COPY . .
 
-# Build NestJS
+# Compile TypeScript → dist/
 RUN npm run build
 
-# Step 2: Production stage
+# ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:18-alpine
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --only=production
+# Create non-root user for security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy build output
+COPY package*.json ./
+
+# Install production deps only
+RUN npm ci --only=production
+
+# Copy compiled output from builder
 COPY --from=builder /app/dist ./dist
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 3000
 
+# Use start:prod script (matches nest convention)
 CMD ["node", "dist/main.js"]

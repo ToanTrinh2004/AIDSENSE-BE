@@ -1,6 +1,25 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
-.git
+
+# Environment files (inject via docker run -e or compose)
 .env
+.env.*
+
+# Dev/test files
+test
+**/*.spec.ts
+**/*.test.ts
+
+# Python NLP service (separate container if needed)
+sos_nlp
+
+# Misc
+.git
+.gitignore
+README.md
+dockerfile
 Dockerfile
-docker-compose.yml
+*.md

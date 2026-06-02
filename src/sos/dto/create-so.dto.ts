@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 
 export class CreateSosDto {
   @IsNotEmpty()
@@ -22,8 +22,11 @@ export class CreateSosDto {
   address_text?: string;
 
   @IsOptional()
-  @IsString()
+  @Matches(/^(0[35789]\d{8})$/, {
+    message: 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam hợp lệ.',
+  })
   phone?: string;
+ 
 
   @IsOptional()
   @IsIn(['PENDING', 'IN_PROGRESS', 'COMPLETE',"CANCELLED"])

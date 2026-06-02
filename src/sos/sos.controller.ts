@@ -19,7 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 export class SosController {
   constructor(private readonly sosService: SosService) {}
 
-  // SOS requests are critical — allow 5 per 10 s per user (generous but not abusable)
+  // Authenticated SOS — generous but not abusable
   @Throttle({ short: { limit: 5, ttl: 10000 }, medium: { limit: 30, ttl: 60000 } })
   @UseGuards(AuthGuard)
   @Post('request')
@@ -40,17 +40,20 @@ export class SosController {
     return this.sosService.findAllSosRequests();
   }
 
-  // No-auth SOS — stricter: 3 per 10 s
-  @Throttle({ short: { limit: 3, ttl: 10000 }, medium: { limit: 15, ttl: 60000 } })
+  // No-auth SOS — strictest: 3 per 10s + IP cooldown in service
+  @Throttle({ short: { limit: 3, ttl: 10000 }, medium: { limit: 10, ttl: 60000 } })
   @Post('request-no-auth')
   @UseInterceptors(FileInterceptor('image'))
   async requestSosWithOutAuth(
     @Body() createSosDto: CreateSosDto,
     @UploadedFile() file: Express.Multer.File,
+    @Req() req,
   ) {
-    return this.sosService.sosRequestWithoutUser(createSosDto, file);
+    const ip = req.ip ?? req.headers['x-forwarded-for'] ?? 'unknown';
+    return this.sosService.sosRequestWithoutUser(createSosDto, file, ip);
   }
 
+  @SkipThrottle()
   @Post('convert')
   async convertPlace(
     @Body('lat') lat: number,

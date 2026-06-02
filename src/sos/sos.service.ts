@@ -10,13 +10,19 @@ import { UpdateSosDto } from './dto/update-so.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { ClaudeNlpService } from './claude-nlp.service';
+import Redis from 'ioredis';
+
+// ── Security 3: IP cooldown constants ─────────────────────────────────────────
+const IP_COOLDOWN_SECONDS = 300; // 5 min between unauth SOS per IP
+const IP_COOLDOWN_PREFIX = 'sos:unauth:ip:';
 
 @Injectable()
 export class SosService {
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly cloudinaryService: CloudinaryService,
-    private readonly claudeNlp: ClaudeNlpService,   // replaces axios call to Python
+    private readonly claudeNlp: ClaudeNlpService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
   async canCreateSos(userId: string): Promise<boolean> {
@@ -31,11 +37,6 @@ export class SosService {
     return data.length === 0;
   }
 
-  /**
-   * Fire-and-forget background AI processing.
-   * Calls Claude instead of the local Python service.
-   * Same DB writes — same schema — FE never notices.
-   */
   private async processAiInBackground(
     sosOriginId: string,
     description: string,
@@ -129,7 +130,19 @@ export class SosService {
   async sosRequestWithoutUser(
     createSosDto: CreateSosDto,
     file: Express.Multer.File,
+    ip: string,
   ) {
+    // ── Security 3: IP cooldown check ───────────────────────────────────────
+    const cooldownKey = `${IP_COOLDOWN_PREFIX}${ip}`;
+    const existing = await this.redis.get(cooldownKey);
+    if (existing) {
+      throw new BadRequestException(
+        'Vui lòng chờ 5 phút trước khi gửi yêu cầu SOS mới.',
+      );
+    }
+    // Set cooldown BEFORE processing (prevents race condition spam)
+    await this.redis.set(cooldownKey, '1', 'EX', IP_COOLDOWN_SECONDS);
+
     try {
       const imageUrl = file
         ? await this.cloudinaryService.uploadBufferFile(file)
@@ -173,7 +186,7 @@ export class SosService {
       };
     } catch (error) {
       if (error instanceof HttpException) throw error;
-      console.error('[requestSos]', error);
+      console.error('[sosRequestWithoutUser]', error);
       throw new InternalServerErrorException('Không thể tạo SOS');
     }
   }
