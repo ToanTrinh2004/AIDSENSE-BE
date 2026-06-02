@@ -1,98 +1,240 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🚨 AIDSENSE — Backend Service
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> **An intelligent emergency rescue platform** that connects people in danger with nearby rescuers in real time. Built with NestJS, Supabase (PostgreSQL), and a Python-powered NLP module for SOS detection.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📌 Table of Contents
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Overview](#overview)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [API Modules](#api-modules)
+- [Docker Deployment](#docker-deployment)
+- [License](#license)
 
-## Project setup
+---
 
-```bash
-$ npm install
+## Overview
+
+**AIDSENSE** is a mobile rescue application that helps users send SOS signals in emergency situations. The backend service handles real-time SOS broadcasting, user authentication, media uploads, email notifications, and integrates a Python NLP module to intelligently classify SOS messages.
+
+The mobile frontend is built with **Flutter** and communicates with this backend via REST APIs.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | [NestJS](https://nestjs.com/) v11 (TypeScript) |
+| Database | PostgreSQL via [Supabase](https://supabase.com/) |
+| ORM | TypeORM |
+| Auth | JWT (`@nestjs/jwt`) + bcrypt |
+| Cache / Queue | Redis (`ioredis`) |
+| Media Storage | Cloudinary |
+| Email | Nodemailer |
+| NLP Module | Python (`sos_nlp`) |
+| Containerization | Docker (multi-stage build) |
+| Runtime | Node.js 18 Alpine |
+
+---
+
+## Architecture
+
+```
+Flutter (Mobile App)
+        │
+        ▼
+  NestJS REST API  ──────────► Supabase (PostgreSQL)
+        │
+        ├──────────────────► Redis (caching / queue)
+        │
+        ├──────────────────► Cloudinary (media uploads)
+        │
+        ├──────────────────► Nodemailer (email alerts)
+        │
+        └──────────────────► Python NLP Service (sos_nlp)
+                              └── SOS message classification
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## Features
 
-# watch mode
-$ npm run start:dev
+- 🔐 **Authentication** — JWT-based login/register with bcrypt password hashing
+- 🆘 **SOS Broadcasting** — Users can send emergency signals with location data
+- 🧠 **NLP SOS Detection** — Python module (`sos_nlp`) analyzes messages to detect distress signals
+- 📍 **Rescue Coordination** — Matches SOS senders with nearby rescuers
+- 🖼️ **Media Upload** — Images/files uploaded to Cloudinary via stream
+- 📧 **Email Notifications** — Automated alerts sent via Nodemailer
+- ⚡ **Redis Caching** — Fast data retrieval and job queuing with ioredis
+- 🐳 **Docker Ready** — Multi-stage Dockerfile for lean production images
+- ✅ **Validation** — Request validation with `class-validator` and `class-transformer`
 
-# production mode
-$ npm run start:prod
+---
+
+## Project Structure
+
+```
+AIDSENSE-BE/
+├── src/                    # NestJS application source
+│   ├── app.module.ts       # Root module
+│   ├── main.ts             # Entry point (port 3000)
+│   └── [feature modules]  # Auth, SOS, Users, Rescue, etc.
+├── sos_nlp/               # Python NLP service for SOS classification
+├── test/                  # E2E and unit tests
+├── dockerfile             # Multi-stage Docker build
+├── package.json
+└── tsconfig.json
 ```
 
-## Run tests
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 18
+- npm
+- PostgreSQL (or a Supabase project)
+- Redis instance
+- Python 3 (for `sos_nlp` module)
+
+### Installation
 
 ```bash
-# unit tests
-$ npm run test
+# Clone the repository
+git clone https://github.com/ToanTrinh2004/AIDSENSE-BE.git
+cd AIDSENSE-BE
 
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+# Install dependencies
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Running the App
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Development mode
+npm run start:dev
+
+# Production mode
+npm run start:prod
+
+# Debug mode
+npm run start:debug
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Running Tests
 
-## Resources
+```bash
+# Unit tests
+npm run test
 
-Check out a few resources that may come in handy when working with NestJS:
+# E2E tests
+npm run test:e2e
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+# Test coverage
+npm run test:cov
+```
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## Environment Variables
 
-## Stay in touch
+Create a `.env` file in the root directory with the following variables:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```env
+# App
+PORT=3000
+NODE_ENV=development
+
+# Database (Supabase / PostgreSQL)
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_anon_key
+DATABASE_URL=your_postgres_connection_string
+
+# JWT
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=7d
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Cloudinary
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Email (Nodemailer)
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USER=your_email@gmail.com
+MAIL_PASS=your_app_password
+```
+
+---
+
+## API Modules
+
+| Module | Description |
+|---|---|
+| `Auth` | Register, login, JWT token management |
+| `Users` | User profile management |
+| `SOS` | SOS signal creation, broadcasting, and status |
+| `Rescue` | Rescuer matching and coordination |
+| `Media` | File/image uploads via Cloudinary |
+| `Notification` | Email alerts via Nodemailer |
+
+> Full API documentation coming soon (Swagger).
+
+---
+
+## Docker Deployment
+
+The project uses a **multi-stage Docker build** to keep the production image minimal.
+
+```bash
+# Build the Docker image
+docker build -t aidsense-be .
+
+# Run the container
+docker run -p 3000:3000 --env-file .env aidsense-be
+```
+
+### Dockerfile Overview
+
+```
+Stage 1 (builder): node:18-alpine
+  → Install all dependencies
+  → Compile TypeScript → dist/
+
+Stage 2 (production): node:18-alpine
+  → Install production deps only
+  → Copy dist/ from builder
+  → Expose port 3000
+  → CMD: node dist/main.js
+```
+
+---
+
+## Python NLP Module (`sos_nlp`)
+
+The `sos_nlp` directory contains a Python-based NLP service responsible for detecting and classifying SOS distress signals from user messages. It is invoked by the NestJS backend when processing incoming SOS requests to add an AI-powered layer of intent detection.
+
+---
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+This project is private and unlicensed. All rights reserved © 2024 ToanTrinh2004.
+
+---
+
+<p align="center">
+  Built with ❤️ using NestJS · Supabase · Flutter · Python
+</p>
