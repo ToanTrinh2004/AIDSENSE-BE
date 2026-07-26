@@ -1,236 +1,239 @@
+// auth.service.ts
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { CreateAuthDto } from './dto/create-auth.dto';
-import { UpdateAuthDto } from './dto/update-auth.dto';
 import { JwtService } from '@nestjs/jwt';
-import { SignupDto } from './dto/auth-dto';
 import * as bcrypt from 'bcrypt';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { jwtConstants } from './constant';
-import { SignInDto } from './dto/auth-dto';
-import { EmailService } from './email.service';
-import { SmsService } from './sms.service';
+import { SmsService, OtpVerifyResult } from './sms.service';
 import Redis from 'ioredis';
+import { SignupDto, SignInDto, OtpType } from './dto/auth-dto';
+import { Messages } from '../utils/messages';
 
 @Injectable()
 export class AuthService {
   constructor(
     private jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private emailService: EmailService,
     private smsService: SmsService,
-    @Inject('REDIS_CLIENT') private readonly redis: Redis
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
-  private generateOtp() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+  private readonly PENDING_SIGNUP_TTL = 600; // 10 phút
+  private readonly OTP_VERIFIED_TTL = 600;
+
+  private checkIsExistingUser(phone: string) {
+    return this.supabase.from('auth').select('*').eq('phone', phone).maybeSingle();
   }
 
-  private checkIsExistingUser(email: string) {
-    return this.supabase
-      .from('auth')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle();
-  }
+  // ── ĐĂNG KÝ ─────────────────────────────────────────────
+  async signUp(dto: SignupDto) {
+    const { phone, password, username } = dto;
 
-  /** Lookup phone number from users table by userId */
-  private async getPhoneByEmail(email: string): Promise<string> {
-    const { data: authData, error: authError } = await this.checkIsExistingUser(email);
-    if (authError || !authData) {
-      throw new BadRequestException('Tài khoản chưa được đăng ký.');
-    }
-    const { data: userData, error: userError } = await this.supabase
-      .from('users')
-      .select('phone')
-      .eq('id', authData.userId)
-      .single();
-    if (userError || !userData?.phone) {
-      throw new BadRequestException('Không tìm thấy số điện thoại của tài khoản.');
-    }
-    // Normalise Vietnamese numbers to E.164 (+84...)
-    let phone: string = userData.phone.trim();
-    if (phone.startsWith('0')) {
-      phone = '+84' + phone.slice(1);
-    } else if (!phone.startsWith('+')) {
-      phone = '+' + phone;
-    }
-    console.log(phone);
-    return phone;
-    
-  }
-
-  async signUp(signUpDto: SignupDto): Promise<any> {
-    const { email, password } = signUpDto;
-    const { data: existingUser, error: selectError } = await this.checkIsExistingUser(email);
+    const { data: existingUser, error: selectError } = await this.checkIsExistingUser(phone);
     if (selectError) {
-      throw new BadRequestException('Không thể kiểm tra người dùng.');
+      throw new BadRequestException(Messages.cannotCheckUser);
     }
-
     if (existingUser) {
-      throw new BadRequestException('Tài khoản đã tồn tại.');
+      throw new BadRequestException(Messages.phoneAlreadyRegistered);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const { data, error } = await this.supabase
-      .from('auth')
-      .insert([{ email: signUpDto.email, password: hashedPassword }])
-      .select()
-      .single();
 
-    if (error) {
-      throw new BadRequestException('Không thể tạo tài khoản: ' + error.message);
+    // Chưa ghi vào DB — chỉ lưu tạm ở Redis, chờ xác thực OTP
+    await this.redis.set(
+      `pending_signup:${phone}`,
+      JSON.stringify({ password: hashedPassword, username }),
+      'EX',
+      this.PENDING_SIGNUP_TTL,
+    );
+
+    await this.smsService.sendOtp(phone);
+
+    return { success: true, message: Messages.otpSentSignup };
+  }
+
+  private async finalizeSignUp(phone: string) {
+    const pendingRaw = await this.redis.get(`pending_signup:${phone}`);
+    if (!pendingRaw) {
+      throw new BadRequestException(Messages.signupRequestExpired);
+    }
+    const { password, username } = JSON.parse(pendingRaw);
+
+    const { data: existingUser } = await this.checkIsExistingUser(phone);
+    if (existingUser) {
+      await this.redis.del(`pending_signup:${phone}`);
+      throw new BadRequestException(Messages.phoneAlreadyRegistered);
     }
 
-    const access_token = await this.jwtService.signAsync(
-      { id: data.userId, email: data.email, role: "USER" },
-      { secret: jwtConstants.secret },
-    );
+    const { data, error } = await this.supabase
+      .from('auth')
+      .insert([{ phone, password }])
+      .select()
+      .single();
+    if (error) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotCreateAccount.vi}: ${error.message}`,
+        en: `${Messages.cannotCreateAccount.en}: ${error.message}`,
+      });
+    }
 
     const { error: userInsertError } = await this.supabase
       .from('users')
-      .insert([{ id: data.userId, roles: 'USER', username: signUpDto.username, phone: signUpDto.phone }]);
-
+      .insert([{ id: data.userId, roles: 'USER', username, phone }]);
     if (userInsertError) {
-      throw new BadRequestException('Không thể tạo hồ sơ người dùng: ' + userInsertError.message);
+      throw new BadRequestException({
+        vi: `${Messages.cannotCreateProfile.vi}: ${userInsertError.message}`,
+        en: `${Messages.cannotCreateProfile.en}: ${userInsertError.message}`,
+      });
     }
 
-    return {
-      success: true,
-      message: 'Đăng ký tài khoản thành công.',
-      access_token,
-    };
+    await this.redis.del(`pending_signup:${phone}`);
+
+    const access_token = await this.jwtService.signAsync(
+      { id: data.userId, phone, role: 'USER' },
+      { secret: jwtConstants.secret },
+    );
+
+    return { success: true, message: Messages.signupSuccess, access_token };
   }
 
-  async signIn(signInDto: SignInDto): Promise<any> {
-    try {
-      const { email, password } = signInDto;
-      const { data: existingUser, error: selectError } = await this.checkIsExistingUser(email);
-      if (selectError) {
-        throw new BadRequestException('Không thể kiểm tra người dùng: ' + selectError.message);
-      }
-
+  // ── OTP ─────────────────────────────────────────────────
+  async sendOtp(phone: string, type: OtpType) {
+    if (type === OtpType.FORGOT_PASSWORD) {
+      const { data: existingUser } = await this.checkIsExistingUser(phone);
       if (!existingUser) {
-        throw new BadRequestException('Thông tin đăng nhập không hợp lệ.');
+        throw new BadRequestException(Messages.phoneNotRegistered);
       }
-
-      const isPasswordValid = await bcrypt.compare(password, existingUser.password);
-      if (!isPasswordValid) {
-        throw new BadRequestException('Thông tin đăng nhập không hợp lệ.');
-      }
-
-      const { data: userData, error: userDataError } = await this.supabase
-        .from('users')
-        .select('*')
-        .eq('id', existingUser.userId)
-        .single();
-      if (userDataError) {
-        throw new BadRequestException('Không thể lấy dữ liệu người dùng: ' + userDataError.message);
-      }
-
-      const access_token = await this.jwtService.signAsync(
-        { id: existingUser.userId, email: existingUser.email, role: userData.roles },
-        { secret: jwtConstants.secret },
-      );
-
-      return {
-        success: true,
-        message: 'Đăng nhập thành công.',
-        access_token,
-        user: userData,
-      };
-    } catch (error) {
-      console.error('Lỗi đăng nhập:', error);
-      throw new BadRequestException('Sai tên đăng nhập hoặc mật khẩu.');
     }
-  }
-
-  async sendOtp(email: string, type: string) {
-    if (type === 'forgotpassword') {
-      const checkIsExistingUser = await this.checkIsExistingUser(email);
-      if (!checkIsExistingUser.data) {
-        throw new BadRequestException('Tài khoản chưa được đăng ký.');
+    if (type === OtpType.SIGNUP) {
+      const pending = await this.redis.get(`pending_signup:${phone}`);
+      if (!pending) {
+        throw new BadRequestException(Messages.signupNotFound);
       }
     }
 
-    const phone = await this.getPhoneByEmail(email);
     await this.smsService.sendOtp(phone);
 
-    return {
-      success: true,
-      message: 'OTP đã được gửi đến số điện thoại.',
-    };
+    return { success: true, message: Messages.otpSent };
   }
 
-  async verifyOtp(email: string, otp: number) {
-    const phone = await this.getPhoneByEmail(email);
-    await this.smsService.verifyOtp(phone, otp.toString());
+  async verifyOtp(phone: string, otp: number, type: OtpType) {
+    const result = await this.smsService.verifyOtp(phone, otp.toString());
 
-    return {
-      success: true,
-      message: 'Xác thực OTP thành công.',
-    };
+    if (result === OtpVerifyResult.EXPIRED) {
+      throw new BadRequestException(Messages.otpExpired);
+    }
+    if (result === OtpVerifyResult.MISMATCH) {
+      throw new BadRequestException(Messages.otpInvalid);
+    }
+
+    // result === SUCCESS
+    if (type === OtpType.SIGNUP) {
+      return this.finalizeSignUp(phone);
+    }
+
+    if (type === OtpType.FORGOT_PASSWORD) {
+      await this.redis.set(`otp_verified:${phone}`, '1', 'EX', this.OTP_VERIFIED_TTL);
+      return { success: true, message: Messages.otpVerifiedSetNewPassword };
+    }
+
+    throw new BadRequestException(Messages.invalidOtpType);
   }
 
-  async forgotPassword(email: string, password: string, confirmPassword: string, otp: number): Promise<any> {
-    const { data: existingUser } = await this.checkIsExistingUser(email);
+  // ── ĐĂNG NHẬP ───────────────────────────────────────────
+  async signIn(dto: SignInDto) {
+    const { phone, password } = dto;
+    const { data: existingUser, error: selectError } = await this.checkIsExistingUser(phone);
+    if (selectError) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotCheckUser.vi}: ${selectError.message}`,
+        en: `${Messages.cannotCheckUser.en}: ${selectError.message}`,
+      });
+    }
     if (!existingUser) {
-      throw new BadRequestException('Không tìm thấy người dùng.');
+      throw new BadRequestException(Messages.invalidCredentials);
     }
 
-    if (password !== confirmPassword) {
-      throw new BadRequestException('Mật khẩu không khớp.');
+    const isPasswordValid = await bcrypt.compare(password, existingUser.password);
+    if (!isPasswordValid) {
+      throw new BadRequestException(Messages.invalidCredentials);
     }
 
-    // Verify OTP via SMS before changing password
-    const verifyResult = await this.verifyOtp(email, otp);
-    if (verifyResult.success) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const { error } = await this.supabase
-        .from('auth')
-        .update({ password: hashedPassword })
-        .eq('email', email);
-
-      if (error) {
-        throw new BadRequestException('Không thể cập nhật mật khẩu.');
-      }
-
-      return {
-        success: true,
-        message: 'Cập nhật mật khẩu thành công.',
-      };
-    } else {
-      throw new BadRequestException('Xác thực OTP thất bại.');
+    const { data: userData, error: userDataError } = await this.supabase
+      .from('users')
+      .select('*')
+      .eq('id', existingUser.userId)
+      .single();
+    if (userDataError) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotFetchUserData.vi}: ${userDataError.message}`,
+        en: `${Messages.cannotFetchUserData.en}: ${userDataError.message}`,
+      });
     }
+
+    const access_token = await this.jwtService.signAsync(
+      { id: existingUser.userId, phone: existingUser.phone, role: userData.roles },
+      { secret: jwtConstants.secret },
+    );
+
+    return { success: true, message: Messages.loginSuccess, access_token, user: userData };
   }
 
-  async sendOtpToTeamLeader(email: string) {
-    const phone = await this.getPhoneByEmail(email);
+  // ── QUÊN MẬT KHẨU ───────────────────────────────────────
+  async forgotPassword(phone: string, password: string, confirmPassword: string) {
+    if (password !== confirmPassword) {
+      throw new BadRequestException(Messages.passwordMismatch);
+    }
 
+    const verifiedFlag = await this.redis.get(`otp_verified:${phone}`);
+    if (!verifiedFlag) {
+      throw new BadRequestException(Messages.otpNotVerified);
+    }
+
+    const { data: existingUser } = await this.checkIsExistingUser(phone);
+    if (!existingUser) {
+      throw new BadRequestException(Messages.userNotFound);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const { error } = await this.supabase
+      .from('auth')
+      .update({ password: hashedPassword })
+      .eq('phone', phone);
+    if (error) {
+      throw new BadRequestException(Messages.cannotUpdatePassword);
+    }
+
+    await this.redis.del(`otp_verified:${phone}`);
+
+    const access_token = await this.jwtService.signAsync(
+      { id: existingUser.userId, phone, role: 'USER' },
+      { secret: jwtConstants.secret },
+    );
+
+    return { success: true, message: Messages.passwordUpdateSuccess, access_token };
+  }
+
+  // ── TEAM LEADER OTP ─────────────────────────────────────
+  async sendOtpToTeamLeader(phone: string) {
     try {
       await this.smsService.sendOtp(phone);
-
-      return {
-        success: true,
-        message: 'OTP đã được gửi đến số điện thoại.',
-      };
+      return { success: true, message: Messages.otpSent };
     } catch (error) {
-      console.error('Error sending OTP to team leader:', error);
-      throw new BadRequestException('Không thể gửi OTP.');
+      throw new BadRequestException(Messages.cannotSendOtp);
     }
   }
 
-  async verifyOtpForTeamLeader(email: string, otp: number) {
-    try {
-      const phone = await this.getPhoneByEmail(email);
-      await this.smsService.verifyOtp(phone, otp.toString());
+  async verifyOtpForTeamLeader(phone: string, otp: number) {
+    const result = await this.smsService.verifyOtp(phone, otp.toString());
 
-      return {
-        success: true,
-        message: 'Xác thực OTP thành công.',
-      };
-    } catch (error) {
-      console.error('Error verifying OTP for team leader:', error);
-      throw new BadRequestException('Không thể xác thực OTP.');
+    if (result === OtpVerifyResult.EXPIRED) {
+      throw new BadRequestException(Messages.otpExpired);
     }
+    if (result === OtpVerifyResult.MISMATCH) {
+      throw new BadRequestException(Messages.otpInvalid);
+    }
+
+    return { success: true, message: Messages.otpVerifySuccess };
   }
 }

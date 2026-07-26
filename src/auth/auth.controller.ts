@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Body, Controller, HttpCode, Patch, Post } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
   SignupDto,
@@ -7,7 +7,7 @@ import {
   SendOtpDto,
   VerifyOtpDto,
   ForgetPasswordDto,
-  TeamEmailDto,
+  TeamPhoneDto,
   TeamVerifyOtpDto,
 } from './dto/auth-dto';
 
@@ -16,68 +16,73 @@ import {
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @ApiOperation({ summary: 'Đăng ký tài khoản mới' })
-  @ApiResponse({ status: 201, description: 'Đăng ký thành công' })
-  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
-  @HttpCode(201)
+  // ================= REGISTER =================
+
   @Post('register')
-  async signUp(@Body() signUpDto: SignupDto) {
-    return this.authService.signUp(signUpDto);
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Register account' })
+  @ApiResponse({ status: 201, description: 'OTP sent successfully' })
+  async signUp(@Body() dto: SignupDto) {
+    return this.authService.signUp(dto);
   }
 
-  @ApiOperation({ summary: 'Đăng nhập' })
-  @ApiResponse({ status: 200, description: 'Đăng nhập thành công' })
-  @ApiResponse({ status: 401, description: 'Sai email hoặc mật khẩu' })
-  @HttpCode(200)
+  // ================= LOGIN =================
+
   @Post('login')
-  async signIn(@Body() signInDto: SignInDto) {
-    return this.authService.signIn(signInDto);
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Login' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  async signIn(@Body() dto: SignInDto) {
+    return this.authService.signIn(dto);
   }
 
-  @ApiOperation({ summary: 'Gửi mã OTP về email' })
-  @ApiResponse({ status: 200, description: 'Gửi OTP thành công' })
+  // ================= SEND OTP =================
+
+  @Post('otp')
   @HttpCode(200)
-  @Post('email')
-  async sendOtp(@Body() body: SendOtpDto) {
-    return this.authService.sendOtp(body.email, body.type);
+  @ApiOperation({ summary: 'Send OTP' })
+  @ApiResponse({ status: 200, description: 'OTP sent successfully' })
+  async sendOtp(@Body() dto: SendOtpDto) {
+    return this.authService.sendOtp(dto.phone, dto.type);
   }
 
-  @ApiOperation({ summary: 'Xác thực mã OTP' })
-  @ApiResponse({ status: 200, description: 'Xác thực OTP thành công' })
-  @ApiResponse({ status: 400, description: 'OTP không hợp lệ hoặc hết hạn' })
+  // ================= VERIFY OTP =================
+
+  @Post('otp/verify')
   @HttpCode(200)
-  @Post('email/otp')
-  async verifyOtp(@Body() body: VerifyOtpDto) {
-    return this.authService.verifyOtp(body.email, body.otp);
+  @ApiOperation({ summary: 'Verify OTP' })
+  @ApiResponse({ status: 200, description: 'OTP verified successfully' })
+  async verifyOtp(@Body() dto: VerifyOtpDto) {
+    return this.authService.verifyOtp(dto.phone, dto.otp, dto.type);
   }
 
-  @ApiOperation({ summary: 'Đặt lại mật khẩu quên' })
-  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
-  @ApiResponse({ status: 400, description: 'OTP không hợp lệ hoặc mật khẩu không khớp' })
+  // ================= FORGOT PASSWORD =================
+
+  @Patch('forgot-password')
   @HttpCode(200)
-  @Patch('forget-password')
-  async forgetPassword(@Body() body: ForgetPasswordDto) {
+  @ApiOperation({ summary: 'Reset password' })
+  @ApiResponse({ status: 200, description: 'Password updated successfully' })
+  async forgotPassword(@Body() dto: ForgetPasswordDto) {
     return this.authService.forgotPassword(
-      body.email,
-      body.password,
-      body.confirmPassword,
-      body.otp,
+      dto.phone,
+      dto.password,
+      dto.confirmPassword,
     );
   }
 
-  @ApiOperation({ summary: 'Gửi OTP cho trưởng nhóm' })
-  @ApiResponse({ status: 200, description: 'Gửi OTP thành công' })
-  @HttpCode(200)
+  // ================= TEAM LEADER =================
+
   @Post('team/otp')
-  async sendOtpToTeamLeader(@Body() body: TeamEmailDto) {
-    return this.authService.sendOtpToTeamLeader(body.email);
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Send OTP to team leader' })
+  async sendOtpToTeamLeader(@Body() dto: TeamPhoneDto) {
+    return this.authService.sendOtpToTeamLeader(dto.phone);
   }
 
-  @ApiOperation({ summary: 'Xác thực OTP cho trưởng nhóm' })
-  @ApiResponse({ status: 200, description: 'Xác thực thành công' })
-  @HttpCode(200)
   @Post('team/verify')
-  async verifyOtpForTeamLeader(@Body() body: TeamVerifyOtpDto) {
-    return this.authService.verifyOtpForTeamLeader(body.email, body.otp);
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Verify team leader OTP' })
+  async verifyOtpForTeamLeader(@Body() dto: TeamVerifyOtpDto) {
+    return this.authService.verifyOtpForTeamLeader(dto.phone, dto.otp);
   }
 }

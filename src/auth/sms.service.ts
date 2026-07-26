@@ -5,6 +5,12 @@ import Redis from 'ioredis';
 const OTP_TTL_SECONDS = 300; // 5 minutes
 const OTP_REDIS_PREFIX = 'otp:';
 
+export enum OtpVerifyResult {
+  SUCCESS = 'SUCCESS',
+  EXPIRED = 'EXPIRED',      // không tìm thấy / hết hạn
+  MISMATCH = 'MISMATCH',    // sai mã
+}
+
 @Injectable()
 export class SmsService {
   private readonly apiKey = process.env.ESMS_API_KEY ?? '';
@@ -14,7 +20,6 @@ export class SmsService {
 
   constructor(@Inject('REDIS_CLIENT') private readonly redis: Redis) {}
 
-  /** Normalise Vietnamese phone to local format (09xx) required by eSMS */
   private normalisePhone(phone: string): string {
     let p = phone.trim();
     if (p.startsWith('+84')) p = '0' + p.slice(3);
@@ -26,19 +31,13 @@ export class SmsService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  /**
-   * Generate OTP → store in Redis → send via eSMS Baotrixemay demo template
-   * Template: "{CODE} la ma xac minh dang ky Baotrixemay cua ban"
-   */
   async sendOtp(phone: string): Promise<void> {
     const normalisedPhone = this.normalisePhone(phone);
     const otp = this.generateOtp();
     const redisKey = `${OTP_REDIS_PREFIX}${normalisedPhone}`;
 
-    // Save OTP to Redis with 5-minute TTL
     await this.redis.set(redisKey, otp, 'EX', OTP_TTL_SECONDS);
 
-    // Must match the exact Baotrixemay demo template — only CODE can change
     const content = `${otp} la ma xac minh dang ky Baotrixemay cua ban`;
 
     const body = {
@@ -74,25 +73,22 @@ export class SmsService {
     }
   }
 
-  /**
-   * Verify OTP against value stored in Redis.
-   * Deletes the key on success (one-time use).
-   */
-  async verifyOtp(phone: string, code: string): Promise<boolean> {
+ 
+  async verifyOtp(phone: string, code: string): Promise<OtpVerifyResult> {
     const normalisedPhone = this.normalisePhone(phone);
     const redisKey = `${OTP_REDIS_PREFIX}${normalisedPhone}`;
 
     const storedOtp = await this.redis.get(redisKey);
 
     if (!storedOtp) {
-      throw new BadRequestException('OTP đã hết hạn hoặc chưa được gửi.');
+      return OtpVerifyResult.EXPIRED;
     }
 
     if (storedOtp !== code.toString()) {
-      throw new BadRequestException('OTP không hợp lệ hoặc đã hết hạn.');
+      return OtpVerifyResult.MISMATCH;
     }
 
     await this.redis.del(redisKey);
-    return true;
+    return OtpVerifyResult.SUCCESS;
   }
 }
