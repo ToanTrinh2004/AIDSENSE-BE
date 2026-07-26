@@ -1,6 +1,6 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
-import { CreateTeamDto } from './dto/create-team.dto';
-import { UpdateTeamDto } from './dto/update-team.dto';
+import { CreateTeamDto } from './dto/team.dto';
+import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import Redis from 'ioredis';

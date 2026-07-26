@@ -5,8 +5,8 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { CreateSosDto } from './dto/create-so.dto';
-import { UpdateSosDto } from './dto/update-so.dto';
+import { CreateSosDto } from './dto/sos.dto';
+import { UpdateSosDto } from './dto/sos.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { ClaudeNlpService } from './claude-nlp.service';

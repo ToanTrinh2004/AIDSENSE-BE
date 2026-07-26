@@ -3,7 +3,7 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { CreateTeamDto } from 'src/team/dto/create-team.dto';
+import { CreateTeamDto } from 'src/team/dto/team.dto';
 import { UpdateEventDto } from './dto/update-events-dto';
 import { stat } from 'fs';
 import { UpdateWeightDto } from './dto/update-weight.dto';

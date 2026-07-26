@@ -4,7 +4,7 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { UpdateEventDto } from './dto/update-events-dto';
 import { UpdateUserDto } from './dto/update-user-dto';
-import { CreateTeamDto } from 'src/team/dto/create-team.dto';
+import { CreateTeamDto } from 'src/team/dto/team.dto';
 import { UpdateWeightDto } from './dto/update-weight.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { RolesGuard } from 'src/roles.guard';

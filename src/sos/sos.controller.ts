@@ -10,16 +10,29 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { SosService } from './sos.service';
-import { CreateSosDto } from './dto/create-so.dto';
+import { CreateSosDto, ConvertPlaceDto } from './dto/sos.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
+@ApiTags('SOS')
 @Controller('sos')
 export class SosController {
   constructor(private readonly sosService: SosService) {}
 
-  // Authenticated SOS — generous but not abusable
+  @ApiOperation({ summary: 'Gửi yêu cầu SOS (đã đăng nhập)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateSosDto })
+  @ApiResponse({ status: 201, description: 'Tạo yêu cầu SOS thành công' })
+  @ApiBearerAuth()
   @Throttle({ short: { limit: 5, ttl: 10000 }, medium: { limit: 30, ttl: 60000 } })
   @UseGuards(AuthGuard)
   @Post('request')
@@ -32,7 +45,8 @@ export class SosController {
     return this.sosService.requestSos(createSosDto, file, req.user);
   }
 
-  // Public read — skip rate limit (cheap query, no abuse surface)
+  @ApiOperation({ summary: 'Lấy danh sách toàn bộ yêu cầu SOS (public)' })
+  @ApiResponse({ status: 200, description: 'Danh sách yêu cầu SOS' })
   @SkipThrottle()
   @HttpCode(200)
   @Get('events/aidsense')
@@ -40,7 +54,10 @@ export class SosController {
     return this.sosService.findAllSosRequests();
   }
 
-  // No-auth SOS — strictest: 3 per 10s + IP cooldown in service
+  @ApiOperation({ summary: 'Gửi yêu cầu SOS (không cần đăng nhập)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: CreateSosDto })
+  @ApiResponse({ status: 201, description: 'Tạo yêu cầu SOS thành công' })
   @Throttle({ short: { limit: 3, ttl: 10000 }, medium: { limit: 10, ttl: 60000 } })
   @Post('request-no-auth')
   @UseInterceptors(FileInterceptor('image'))
@@ -53,13 +70,12 @@ export class SosController {
     return this.sosService.sosRequestWithoutUser(createSosDto, file, ip);
   }
 
+  @ApiOperation({ summary: 'Chuyển toạ độ (lat/lon) thành tên địa điểm' })
+  @ApiResponse({ status: 200, description: 'Tên địa điểm' })
   @SkipThrottle()
   @Post('convert')
-  async convertPlace(
-    @Body('lat') lat: number,
-    @Body('lon') lon: number,
-  ) {
-    const locationName = await this.sosService.convertPlace(lat, lon);
+  async convertPlace(@Body() body: ConvertPlaceDto) {
+    const locationName = await this.sosService.convertPlace(body.lat, body.lon);
     return { location_name: locationName };
   }
 }

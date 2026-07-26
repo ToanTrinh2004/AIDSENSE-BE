@@ -1,18 +1,24 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ChatbotService } from './chatbot.service';
-import { CreateChatbotDto } from './dto/create-chatbot.dto';
-import { UpdateChatbotDto } from './dto/update-chatbot.dto';
+import { ChatMessageDto, InsertDocDto } from './dto/chatbot.dto';
 
+@ApiTags('Chatbot')
 @Controller('chatbot')
 export class ChatbotController {
   constructor(private readonly chatbotService: ChatbotService) {}
 
+  @ApiOperation({ summary: 'Gửi tin nhắn tới chatbot' })
+  @ApiResponse({ status: 200, description: 'Trả lời từ chatbot' })
   @Post('chat')
-  async chatWithBot(@Body('message') message: string) {
-    return this.chatbotService.chatWithBot(message);
+  async chatWithBot(@Body() body: ChatMessageDto) {
+    return this.chatbotService.chatWithBot(body.message);
   }
+
+  @ApiOperation({ summary: 'Thêm tài liệu vào knowledge base (RAG)' })
+  @ApiResponse({ status: 200, description: 'Thêm tài liệu thành công' })
   @Post('insert-docs')
-  async insertDocs(@Body('content') content: string) {  
-    return this.chatbotService.insertDocument( content);
+  async insertDocs(@Body() body: InsertDocDto) {
+    return this.chatbotService.insertDocument(body.content);
   }
 }

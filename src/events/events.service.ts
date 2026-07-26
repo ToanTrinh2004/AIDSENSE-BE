@@ -4,7 +4,7 @@ import { EventDto } from './dto/event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { ScoreDto } from './dto/score.dto';
+import { ScoreDto } from './dto/event.dto';
 
 @Injectable()
 export class EventsService {
