@@ -42,9 +42,5 @@ export class UpdateProfileDto {
   @IsInt()
   @Transform(({ value }) => Number(Array.isArray(value) ? value[0] : value))
   team_id?: number;
-
-  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Ảnh đại diện' })
-  avatar?: any;
-
  
 }
