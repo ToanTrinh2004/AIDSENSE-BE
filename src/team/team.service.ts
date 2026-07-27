@@ -11,7 +11,7 @@ export class TeamService {
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly cloudinaryService: CloudinaryService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis
-  ) {}
+  ) { }
 
   async createTeam(
     createTeamDto: CreateTeamDto,
@@ -21,33 +21,33 @@ export class TeamService {
     const documentsUrl = file
       ? await this.cloudinaryService.uploadDocument(file)
       : null;
-  
+
     const userId = user.id;
-  
+
     try {
-      // 1️⃣ Check existing pending team by leader
+
       const { data: existingTeam, error: checkError } = await this.supabase
         .from('team_rescue')
         .select('id, team_status')
         .eq('leader_id', userId)
         .eq('team_status', 'PENDING')
         .maybeSingle();
-  
+
       if (checkError) {
         throw new HttpException(
           checkError.message,
           HttpStatus.BAD_REQUEST,
         );
       }
-  
+
       if (existingTeam) {
         throw new HttpException(
           'Bạn đã đăng ký đội cứu hộ và đang chờ Admin xét duyệt.',
           HttpStatus.CONFLICT,
         );
       }
-  
-      // 2️⃣ Upload + insert team
+
+
       const { data: teamData, error: teamError } = await this.supabase
         .from('team_rescue')
         .insert([{
@@ -58,30 +58,29 @@ export class TeamService {
         }])
         .select()
         .single();
-  
+
       if (teamError) {
         throw new HttpException(
           teamError.message,
           HttpStatus.BAD_REQUEST,
         );
       }
-  
-      // 3️⃣ Update user role
+
       const { error: userUpdateError } = await this.supabase
         .from('users')
         .update({
-          roles: 'TEAM_LEADER',
+          roles: 'LEADER',
           team_id: teamData.id,
         })
         .eq('id', userId);
-  
+
       if (userUpdateError) {
         throw new HttpException(
           `Không thể cập nhật vai trò người dùng: ${userUpdateError.message}`,
           HttpStatus.BAD_REQUEST,
         );
       }
-  
+
       return {
         message: 'Thành công tạo đội cứu trợ, vui lòng chờ Admin xét duyệt.',
         data: teamData,
@@ -91,9 +90,9 @@ export class TeamService {
       throw error;
     }
   }
-  
-  
-  
+
+
+
   async supporting(sosId: string, user: any) {
     const teamId = await this.validateApprovedTeam(user);
     await this.validateSosStatus(sosId, 'PENDING');
@@ -167,7 +166,7 @@ export class TeamService {
       .select('id, team_status')
       .eq('leader_id', leaderId)
       .single();
-    
+
 
     if (error || !data || data.team_status !== 'APPROVED') {
       throw new HttpException('Team không tồn tại hoặc chưa được phê duyệt', HttpStatus.BAD_REQUEST);
@@ -218,11 +217,11 @@ export class TeamService {
       .eq('teamId', teamId)
       .eq(status ? 'status' : '', status ? status : '');
 
-    if (error ) {
+    if (error) {
       throw new HttpException('Không tìm thấy đội cứu trợ', HttpStatus.BAD_REQUEST);
     }
 
-  
+
     return {
       message: 'Lấy danh sách SOS thành công',
       data,

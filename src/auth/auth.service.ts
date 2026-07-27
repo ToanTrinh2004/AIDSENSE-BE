@@ -25,7 +25,7 @@ export class AuthService {
     return this.supabase.from('auth').select('*').eq('phone', phone).maybeSingle();
   }
 
-  // ── ĐĂNG KÝ ─────────────────────────────────────────────
+
   async signUp(dto: SignupDto) {
     const { phone, password, username } = dto;
 
@@ -39,7 +39,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Chưa ghi vào DB — chỉ lưu tạm ở Redis, chờ xác thực OTP
+
     await this.redis.set(
       `pending_signup:${phone}`,
       JSON.stringify({ password: hashedPassword, username }),
@@ -78,8 +78,8 @@ export class AuthService {
     }
 
     const { error: userInsertError } = await this.supabase
-      .from('users')
-      .insert([{ id: data.userId, roles: 'USER', username, phone }]);
+    .from('users')
+    .insert([{ id: data.userId, roles: 'GUEST', username, phone }]);
     if (userInsertError) {
       throw new BadRequestException({
         vi: `${Messages.cannotCreateProfile.vi}: ${userInsertError.message}`,
@@ -90,14 +90,14 @@ export class AuthService {
     await this.redis.del(`pending_signup:${phone}`);
 
     const access_token = await this.jwtService.signAsync(
-      { id: data.userId, phone, role: 'USER' },
+      { id: data.userId, phone, role: 'GUEST' },
       { secret: jwtConstants.secret },
     );
 
     return { success: true, message: Messages.signupSuccess, access_token };
   }
 
-  // ── OTP ─────────────────────────────────────────────────
+
   async sendOtp(phone: string, type: OtpType) {
     if (type === OtpType.FORGOT_PASSWORD) {
       const { data: existingUser } = await this.checkIsExistingUser(phone);
@@ -127,7 +127,7 @@ export class AuthService {
       throw new BadRequestException(Messages.otpInvalid);
     }
 
-    // result === SUCCESS
+
     if (type === OtpType.SIGNUP) {
       return this.finalizeSignUp(phone);
     }
@@ -140,7 +140,6 @@ export class AuthService {
     throw new BadRequestException(Messages.invalidOtpType);
   }
 
-  // ── ĐĂNG NHẬP ───────────────────────────────────────────
   async signIn(dto: SignInDto) {
     const { phone, password } = dto;
     const { data: existingUser, error: selectError } = await this.checkIsExistingUser(phone);
@@ -179,7 +178,6 @@ export class AuthService {
     return { success: true, message: Messages.loginSuccess, access_token, user: userData };
   }
 
-  // ── QUÊN MẬT KHẨU ───────────────────────────────────────
   async forgotPassword(phone: string, password: string, confirmPassword: string) {
     if (password !== confirmPassword) {
       throw new BadRequestException(Messages.passwordMismatch);
@@ -207,14 +205,14 @@ export class AuthService {
     await this.redis.del(`otp_verified:${phone}`);
 
     const access_token = await this.jwtService.signAsync(
-      { id: existingUser.userId, phone, role: 'USER' },
+      { id: existingUser.userId, phone, role: 'GUEST' },
       { secret: jwtConstants.secret },
     );
 
     return { success: true, message: Messages.passwordUpdateSuccess, access_token };
   }
 
-  // ── TEAM LEADER OTP ─────────────────────────────────────
+  
   async sendOtpToTeamLeader(phone: string) {
     try {
       await this.smsService.sendOtp(phone);
