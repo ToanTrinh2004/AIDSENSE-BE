@@ -12,10 +12,10 @@ import { UserModule } from './user/user.module';
 import { TeamModule } from './team/team.module';
 import { EventsModule } from './events/events.module';
 import { AdminModule } from './admin/admin.module';
-import { RedisProvider } from './RedisService';
 import { ChatbotModule } from './chatbot/chatbot.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -33,17 +33,18 @@ import { APP_GUARD } from '@nestjs/core';
     EventsModule,
     AdminModule,
     ChatbotModule,
+    RedisModule,
 
     ThrottlerModule.forRoot([
       {
         name: 'short',
-        ttl: 10000,   // 10 seconds
-        limit: 10,    // default: 10 req / 10s per IP
+        ttl: 10000,   
+        limit: 10,    
       },
       {
         name: 'medium',
-        ttl: 60000,   // 1 minute
-        limit: 60,    // default: 60 req / min per IP
+        ttl: 60000,   
+        limit: 60,    
       },
     ]),
   ],
@@ -52,8 +53,6 @@ import { APP_GUARD } from '@nestjs/core';
   providers: [
     AppService,
     CloudinaryService,
-    RedisProvider,
-    // Apply throttler globally to every route
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
