@@ -1,140 +1,90 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, MinLength } from 'class-validator';
+import { IsEnum, IsNotEmpty, MinLength, Matches } from 'class-validator';
 
 export enum OtpType {
   SIGNUP = 'signup',
   FORGOT_PASSWORD = 'forgot-password',
 }
 
+const PHONE_REGEX = /^(0[35789]\d{8})$/;
+const PHONE_MESSAGE = 'Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam hợp lệ.';
+
 export class SignupDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({
-    example: 'Nguyen Van A',
-    description: 'Username',
-  })
+  @ApiProperty({ example: 'Nguyen Van A', description: 'Username' })
   @IsNotEmpty({ message: 'Tên không được để trống' })
   username: string;
 
-  @ApiProperty({
-    example: '123456',
-    description: 'Password',
-    minLength: 6,
-  })
+  @ApiProperty({ example: '123456', description: 'Password', minLength: 6 })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password: string;
 }
 
 export class SignInDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({
-    example: '123456',
-    description: 'Password',
-    minLength: 6,
-  })
+  @ApiProperty({ example: '123456', description: 'Password' })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
-  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password: string;
 }
 
 export class SendOtpDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({
-    enum: OtpType,
-    example: OtpType.SIGNUP,
-    description: 'OTP type',
-  })
+  @ApiProperty({ enum: OtpType, example: OtpType.SIGNUP, description: 'OTP type' })
   @IsEnum(OtpType, { message: 'Loại OTP không hợp lệ' })
   type: OtpType;
 }
 
 export class VerifyOtpDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({
-    example: 123456,
-    description: 'OTP code',
-  })
+  @ApiProperty({ example: 123456, description: 'OTP code' })
   @IsNotEmpty({ message: 'OTP không được để trống' })
   otp: number;
 
-  @ApiProperty({
-    enum: OtpType,
-    example: OtpType.SIGNUP,
-    description: 'OTP type',
-  })
+  @ApiProperty({ enum: OtpType, example: OtpType.SIGNUP, description: 'OTP type' })
   @IsEnum(OtpType, { message: 'Loại OTP không hợp lệ' })
   type: OtpType;
 }
 
 export class ForgetPasswordDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({
-    example: 'newpassword123',
-    minLength: 6,
-  })
+  @ApiProperty({ example: 'newpassword123', minLength: 6 })
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password: string;
 
-  @ApiProperty({
-    example: 'newpassword123',
-  })
+  @ApiProperty({ example: 'newpassword123' })
   @IsNotEmpty({ message: 'Xác nhận mật khẩu không được để trống' })
   confirmPassword: string;
 }
 
 export class TeamPhoneDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Team leader phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Team leader phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 }
 
 export class TeamVerifyOtpDto {
-  @ApiProperty({
-    example: '0901234567',
-    description: 'Team leader phone number',
-  })
-  @IsNotEmpty({ message: 'Số điện thoại không được để trống' })
+  @ApiProperty({ example: '0901234567', description: 'Team leader phone number' })
+  @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({
-    example: 123456,
-    description: 'OTP code',
-  })
+  @ApiProperty({ example: 123456, description: 'OTP code' })
   @IsNotEmpty({ message: 'OTP không được để trống' })
   otp: number;
-  //gggg
 }

@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { LangInterceptor } from './common/lang.interceptor';
+import { LangExceptionFilter } from './common/lang-exception.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 
@@ -13,7 +15,6 @@ async function bootstrap() {
     origin: allowedOrigins,
   });
 
- // size limits to prevent abuse (e.g., large file uploads)
   app.use(require('express').json({ limit: '5mb' }));
   app.use(require('express').urlencoded({ limit: '5mb', extended: true }));
 
@@ -24,6 +25,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+
+  app.useGlobalInterceptors(new LangInterceptor());
+  app.useGlobalFilters(new LangExceptionFilter());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('AIDSENSE API')

@@ -1,3 +1,16 @@
+export interface BilingualMessage {
+  vi: string;
+  en: string;
+}
+
+export function pickMessage(msg: BilingualMessage, lang?: string): string {
+  return lang?.toLowerCase() === 'en' ? msg.en : msg.vi; 
+}
+
+export function isBilingualMessage(value: any): value is BilingualMessage {
+  return value && typeof value === 'object' && ('vi' in value || 'en' in value);
+}
+
 export const Messages = {
     otpSentSignup: { vi: 'OTP đã được gửi đến số điện thoại. Vui lòng xác thực để hoàn tất đăng ký.', en: 'OTP has been sent to your phone. Please verify to complete registration.' },
     otpSent: { vi: 'OTP đã được gửi đến số điện thoại.', en: 'OTP has been sent to your phone.' },
@@ -25,3 +38,4 @@ export const Messages = {
     otpExpired: { vi: 'OTP đã hết hạn hoặc chưa được gửi.', en: 'OTP has expired or was never sent.' },
     otpInvalid: { vi: 'OTP không hợp lệ.', en: 'Invalid OTP.' },
   };
+  
