@@ -37,5 +37,6 @@ export const Messages = {
     cannotVerifyOtp: { vi: 'Không thể xác thực OTP.', en: 'Unable to verify OTP.' },
     otpExpired: { vi: 'OTP đã hết hạn hoặc chưa được gửi.', en: 'OTP has expired or was never sent.' },
     otpInvalid: { vi: 'OTP không hợp lệ.', en: 'Invalid OTP.' },
+    logoutSuccess: { vi: 'Đăng xuất thành công.', en: 'Logged out successfully.' }
   };
   

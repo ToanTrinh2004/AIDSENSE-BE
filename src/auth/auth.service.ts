@@ -3,6 +3,7 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 import { jwtConstants } from './constant';
 import { SmsService, OtpVerifyResult } from './sms.service';
 import Redis from 'ioredis';
@@ -20,11 +21,11 @@ export class AuthService {
 
   private readonly PENDING_SIGNUP_TTL = 600; // 10 phút
   private readonly OTP_VERIFIED_TTL = 600;
+  private readonly SESSION_TTL = 86400; // 1 ngày, khớp với JWT expiresIn
 
   private checkIsExistingUser(phone: string) {
     return this.supabase.from('auth').select('*').eq('phone', phone).maybeSingle();
   }
-
 
   async signUp(dto: SignupDto) {
     const { phone, password, username } = dto;
@@ -38,7 +39,6 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-
 
     await this.redis.set(
       `pending_signup:${phone}`,
@@ -78,8 +78,8 @@ export class AuthService {
     }
 
     const { error: userInsertError } = await this.supabase
-    .from('users')
-    .insert([{ id: data.userId, roles: 'GUEST', username, phone }]);
+      .from('users')
+      .insert([{ id: data.userId, roles: 'GUEST', username, phone }]);
     if (userInsertError) {
       throw new BadRequestException({
         vi: `${Messages.cannotCreateProfile.vi}: ${userInsertError.message}`,
@@ -89,14 +89,16 @@ export class AuthService {
 
     await this.redis.del(`pending_signup:${phone}`);
 
+    const jti = randomUUID();
+    await this.redis.set(`session:${data.userId}`, jti, 'EX', this.SESSION_TTL);
+
     const access_token = await this.jwtService.signAsync(
-      { id: data.userId, phone, role: 'GUEST' },
+      { id: data.userId, phone, role: 'GUEST', jti },
       { secret: jwtConstants.secret },
     );
 
     return { success: true, message: Messages.signupSuccess, access_token };
   }
-
 
   async sendOtp(phone: string, type: OtpType) {
     if (type === OtpType.FORGOT_PASSWORD) {
@@ -126,7 +128,6 @@ export class AuthService {
     if (result === OtpVerifyResult.MISMATCH) {
       throw new BadRequestException(Messages.otpInvalid);
     }
-
 
     if (type === OtpType.SIGNUP) {
       return this.finalizeSignUp(phone);
@@ -170,8 +171,11 @@ export class AuthService {
       });
     }
 
+    const jti = randomUUID();
+    await this.redis.set(`session:${existingUser.userId}`, jti, 'EX', this.SESSION_TTL);
+
     const access_token = await this.jwtService.signAsync(
-      { id: existingUser.userId, phone: existingUser.phone, role: userData.roles },
+      { id: existingUser.userId, phone: existingUser.phone, role: userData.roles, jti },
       { secret: jwtConstants.secret },
     );
 
@@ -204,15 +208,35 @@ export class AuthService {
 
     await this.redis.del(`otp_verified:${phone}`);
 
+    // Lấy role thật từ bảng users, không hardcode
+    const { data: userData, error: userDataError } = await this.supabase
+      .from('users')
+      .select('roles')
+      .eq('id', existingUser.userId)
+      .single();
+    if (userDataError) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotFetchUserData.vi}: ${userDataError.message}`,
+        en: `${Messages.cannotFetchUserData.en}: ${userDataError.message}`,
+      });
+    }
+
+    const jti = randomUUID();
+    await this.redis.set(`session:${existingUser.userId}`, jti, 'EX', this.SESSION_TTL);
+
     const access_token = await this.jwtService.signAsync(
-      { id: existingUser.userId, phone, role: 'GUEST' },
+      { id: existingUser.userId, phone, role: userData.roles, jti },
       { secret: jwtConstants.secret },
     );
 
     return { success: true, message: Messages.passwordUpdateSuccess, access_token };
   }
 
-  
+  async logout(userId: string) {
+    await this.redis.del(`session:${userId}`);
+    return { success: true, message: Messages.logoutSuccess };
+  }
+
   async sendOtpToTeamLeader(phone: string) {
     try {
       await this.smsService.sendOtp(phone);
