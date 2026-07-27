@@ -49,7 +49,7 @@ export class VerifyOtpDto {
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
   phone: string;
 
-  @ApiProperty({ example: 123456, description: 'OTP code' })
+  @ApiProperty({ example: 1234, description: 'OTP code' })
   @IsNotEmpty({ message: 'OTP không được để trống' })
   otp: number;
 
