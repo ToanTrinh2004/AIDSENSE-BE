@@ -37,10 +37,5 @@ export class UpdateProfileDto {
   @IsString()
   address?: string;
 
-  @ApiPropertyOptional({ example: 4, description: 'ID đội tham gia' })
-  @IsOptional()
-  @IsInt()
-  @Transform(({ value }) => Number(Array.isArray(value) ? value[0] : value))
-  team_id?: number;
  
 }
