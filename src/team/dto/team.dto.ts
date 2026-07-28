@@ -54,6 +54,7 @@ export class CreateTeamDto {
   position: TeamContactRole;
 
   @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Ảnh giấy xác nhận' })
+  @IsOptional()
   file?: any;
 }
 
