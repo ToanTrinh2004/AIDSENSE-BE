@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { UpdateProfileDto } from './dto/user.dto';
+import { Messages } from 'src/utils/messages';
 
 @Injectable()
 export class UserService {
@@ -92,5 +93,39 @@ export class UserService {
     }
     return data;
   }
+  async findUsersBySameProvince(user: any) {
+    const userId = user.id;
   
+    const { data: currentUser, error: currentUserError } = await this.supabase
+      .from('users')
+      .select('province')
+      .eq('id', userId)
+      .single();
+  
+    if (currentUserError) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotFetchUserProvince.vi}: ${currentUserError.message}`,
+        en: `${Messages.cannotFetchUserProvince.en}: ${currentUserError.message}`,
+      });
+    }
+  
+    if (!currentUser?.province) {
+      throw new BadRequestException(Messages.provinceNotSet);
+    }
+  
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('id, username, phone, province, avatar')
+      .eq('province', currentUser.province)
+      .neq('id', userId);
+  
+    if (error) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotFetchSameProvinceUsers.vi}: ${error.message}`,
+        en: `${Messages.cannotFetchSameProvinceUsers.en}: ${error.message}`,
+      });
+    }
+  
+    return data;
+  }
 }

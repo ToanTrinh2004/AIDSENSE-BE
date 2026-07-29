@@ -84,4 +84,14 @@ export class UserController {
   ) {
     return this.userService.updateProfile(req.user, updateProfileDto, avatar);
   }
+
+ 
+  @ApiOperation({ summary: 'Tìm người dùng cùng tỉnh/thành phố' })
+  @ApiResponse({ status: 200, description: 'Danh sách người dùng cùng tỉnh' })
+  @Get('profile/same-province')
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  async findUsersBySameProvince(@Req() req) {
+    return this.userService.findUsersBySameProvince(req.user);
+  }
 }

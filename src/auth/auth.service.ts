@@ -257,39 +257,5 @@ export class AuthService {
     return { success: true, message: Messages.otpVerifySuccess };
   }
 
-  async findUsersBySameProvince(user: any) {
-    const userId = user.id;
-  
-    const { data: currentUser, error: currentUserError } = await this.supabase
-      .from('users')
-      .select('province')
-      .eq('id', userId)
-      .single();
-  
-    if (currentUserError) {
-      throw new BadRequestException({
-        vi: `${Messages.cannotFetchUserProvince.vi}: ${currentUserError.message}`,
-        en: `${Messages.cannotFetchUserProvince.en}: ${currentUserError.message}`,
-      });
-    }
-  
-    if (!currentUser?.province) {
-      throw new BadRequestException(Messages.provinceNotSet);
-    }
-  
-    const { data, error } = await this.supabase
-      .from('users')
-      .select('id, username, phone, province, avatar')
-      .eq('province', currentUser.province)
-      .neq('id', userId);
-  
-    if (error) {
-      throw new BadRequestException({
-        vi: `${Messages.cannotFetchSameProvinceUsers.vi}: ${error.message}`,
-        en: `${Messages.cannotFetchSameProvinceUsers.en}: ${error.message}`,
-      });
-    }
-  
-    return data;
-  }
+ 
 }

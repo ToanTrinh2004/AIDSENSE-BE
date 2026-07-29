@@ -87,13 +87,5 @@ export class AuthController {
   async verifyOtpForTeamLeader(@Body() dto: TeamVerifyOtpDto) {
     return this.authService.verifyOtpForTeamLeader(dto.phone, dto.otp);
   }
-
-  @ApiOperation({ summary: 'Tìm người dùng cùng tỉnh/thành phố' })
-  @ApiResponse({ status: 200, description: 'Danh sách người dùng cùng tỉnh' })
-  @HttpCode(200)
-  @UseGuards(AuthGuard)
-  @Get('profile/same-province')
-  async findUsersBySameProvince(@Req() req) {
-    return this.userService.findUsersBySameProvince(req.user);
-  }
+  
 }
