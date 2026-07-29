@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
@@ -10,11 +10,13 @@ import {
   TeamPhoneDto,
   TeamVerifyOtpDto,
 } from './dto/auth-dto';
+import { AuthGuard } from './auth.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  userService: any;
+  constructor(private readonly authService: AuthService) { }
 
   // ================= REGISTER =================
 
@@ -84,5 +86,14 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify team leader OTP' })
   async verifyOtpForTeamLeader(@Body() dto: TeamVerifyOtpDto) {
     return this.authService.verifyOtpForTeamLeader(dto.phone, dto.otp);
+  }
+
+  @ApiOperation({ summary: 'Tìm người dùng cùng tỉnh/thành phố' })
+  @ApiResponse({ status: 200, description: 'Danh sách người dùng cùng tỉnh' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Get('profile/same-province')
+  async findUsersBySameProvince(@Req() req) {
+    return this.userService.findUsersBySameProvince(req.user);
   }
 }

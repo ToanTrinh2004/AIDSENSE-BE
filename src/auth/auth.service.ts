@@ -28,8 +28,8 @@ export class AuthService {
   }
 
   async signUp(dto: SignupDto) {
-    const { phone, password, username } = dto;
-
+    const { phone, password, username, province } = dto;
+  
     const { data: existingUser, error: selectError } = await this.checkIsExistingUser(phone);
     if (selectError) {
       throw new BadRequestException(Messages.cannotCheckUser);
@@ -37,34 +37,34 @@ export class AuthService {
     if (existingUser) {
       throw new BadRequestException(Messages.phoneAlreadyRegistered);
     }
-
+  
     const hashedPassword = await bcrypt.hash(password, 10);
-
+  
     await this.redis.set(
       `pending_signup:${phone}`,
-      JSON.stringify({ password: hashedPassword, username }),
+      JSON.stringify({ password: hashedPassword, username, province }),
       'EX',
       this.PENDING_SIGNUP_TTL,
     );
-
+  
     await this.smsService.sendOtp(phone);
-
+  
     return { success: true, message: Messages.otpSentSignup };
   }
-
+  
   private async finalizeSignUp(phone: string) {
     const pendingRaw = await this.redis.get(`pending_signup:${phone}`);
     if (!pendingRaw) {
       throw new BadRequestException(Messages.signupRequestExpired);
     }
-    const { password, username } = JSON.parse(pendingRaw);
-
+    const { password, username, province } = JSON.parse(pendingRaw);
+  
     const { data: existingUser } = await this.checkIsExistingUser(phone);
     if (existingUser) {
       await this.redis.del(`pending_signup:${phone}`);
       throw new BadRequestException(Messages.phoneAlreadyRegistered);
     }
-
+  
     const { data, error } = await this.supabase
       .from('auth')
       .insert([{ phone, password }])
@@ -76,30 +76,29 @@ export class AuthService {
         en: `${Messages.cannotCreateAccount.en}: ${error.message}`,
       });
     }
-
+  
     const { error: userInsertError } = await this.supabase
       .from('users')
-      .insert([{ id: data.userId, roles: 'GUEST', username, phone }]);
+      .insert([{ id: data.userId, roles: 'GUEST', username, phone, province }]);
     if (userInsertError) {
       throw new BadRequestException({
         vi: `${Messages.cannotCreateProfile.vi}: ${userInsertError.message}`,
         en: `${Messages.cannotCreateProfile.en}: ${userInsertError.message}`,
       });
     }
-
+  
     await this.redis.del(`pending_signup:${phone}`);
-
+  
     const jti = randomUUID();
     await this.redis.set(`session:${data.userId}`, jti, 'EX', this.SESSION_TTL);
-
+  
     const access_token = await this.jwtService.signAsync(
       { id: data.userId, phone, role: 'GUEST', jti },
       { secret: jwtConstants.secret },
     );
-
+  
     return { success: true, message: Messages.signupSuccess, access_token };
   }
-
   async sendOtp(phone: string, type: OtpType) {
     if (type === OtpType.FORGOT_PASSWORD) {
       const { data: existingUser } = await this.checkIsExistingUser(phone);
@@ -208,7 +207,6 @@ export class AuthService {
 
     await this.redis.del(`otp_verified:${phone}`);
 
-    // Lấy role thật từ bảng users, không hardcode
     const { data: userData, error: userDataError } = await this.supabase
       .from('users')
       .select('roles')
@@ -257,5 +255,41 @@ export class AuthService {
     }
 
     return { success: true, message: Messages.otpVerifySuccess };
+  }
+
+  async findUsersBySameProvince(user: any) {
+    const userId = user.id;
+  
+    const { data: currentUser, error: currentUserError } = await this.supabase
+      .from('users')
+      .select('province')
+      .eq('id', userId)
+      .single();
+  
+    if (currentUserError) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotFetchUserProvince.vi}: ${currentUserError.message}`,
+        en: `${Messages.cannotFetchUserProvince.en}: ${currentUserError.message}`,
+      });
+    }
+  
+    if (!currentUser?.province) {
+      throw new BadRequestException(Messages.provinceNotSet);
+    }
+  
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('id, username, phone, province, avatar')
+      .eq('province', currentUser.province)
+      .neq('id', userId);
+  
+    if (error) {
+      throw new BadRequestException({
+        vi: `${Messages.cannotFetchSameProvinceUsers.vi}: ${error.message}`,
+        en: `${Messages.cannotFetchSameProvinceUsers.en}: ${error.message}`,
+      });
+    }
+  
+    return data;
   }
 }

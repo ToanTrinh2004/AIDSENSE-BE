@@ -22,8 +22,11 @@ export class SignupDto {
   @IsNotEmpty({ message: 'Mật khẩu không được để trống' })
   @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
   password: string;
-}
 
+  @ApiProperty({ example: 'TP. Hồ Chí Minh', description: 'Tỉnh/Thành phố' })
+  @IsNotEmpty({ message: 'Tỉnh/Thành phố không được để trống' })
+  province: string;
+}
 export class SignInDto {
   @ApiProperty({ example: '0901234567', description: 'Phone number' })
   @Matches(PHONE_REGEX, { message: PHONE_MESSAGE })
