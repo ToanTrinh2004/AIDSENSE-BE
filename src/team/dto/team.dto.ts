@@ -52,10 +52,6 @@ export class CreateTeamDto {
   @ApiProperty({ example: TeamContactRole.LEADER, enum: TeamContactRole, description: 'Vai trò người đăng ký' })
   @IsIn([TeamContactRole.LEADER, TeamContactRole.VOLUNTEER], { message: 'Vai trò không hợp lệ' })
   position: TeamContactRole;
-
-  @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Ảnh giấy xác nhận' })
-  @IsOptional()
-  file?: any;
 }
 
 export class UpdateTeamDto extends PartialType(CreateTeamDto) {}

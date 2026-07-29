@@ -20,6 +20,8 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiExtraModels,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
 import { CreateTeamDto } from './dto/team.dto';
@@ -30,11 +32,28 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @ApiBearerAuth()
 @Controller('team')
 export class TeamController {
-  constructor(private readonly teamService: TeamService) {}
+  constructor(private readonly teamService: TeamService) { }
 
   @ApiOperation({ summary: 'Đăng ký thông tin đội' })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: CreateTeamDto })
+  @ApiBody({
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(CreateTeamDto) },
+        {
+          type: 'object',
+          properties: {
+            file: {
+              type: 'string',
+              format: 'binary',
+              description: 'Ảnh giấy xác nhận',
+            },
+          },
+        },
+      ],
+    },
+  })
+  @ApiExtraModels(CreateTeamDto)
   @ApiResponse({ status: 200, description: 'Tạo đội thành công' })
   @HttpCode(200)
   @UseGuards(AuthGuard)
