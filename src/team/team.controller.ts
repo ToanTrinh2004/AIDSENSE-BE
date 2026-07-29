@@ -58,7 +58,7 @@ export class TeamController {
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Post('register/informations')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('document'))
   async create(
     @Body() createTeamDto: CreateTeamDto,
     @UploadedFile() file: Express.Multer.File,
