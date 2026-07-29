@@ -1,16 +1,19 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
-import { CreateTeamDto, QueryTeamDto } from './dto/team.dto';
+import { CreateTeamDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import Redis from 'ioredis';
+import { Messages } from 'src/utils/messages';
+import { FirebaseService } from 'src/firebase/FirebaseService';
 
 @Injectable()
 export class TeamService {
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly cloudinaryService: CloudinaryService,
-    @Inject('REDIS_CLIENT') private readonly redis: Redis
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    private readonly firebaseService: FirebaseService,
   ) { }
 
   async createTeam(
@@ -230,12 +233,12 @@ export class TeamService {
 
   async findAllTeams(query: QueryTeamDto) {
     const { province, name, size_member, page = 1, limit = 10 } = query;
-  
+
     let request = this.supabase
       .from('team_rescue')
       .select('*', { count: 'exact' })
       .eq('team_status', 'APPROVED'); // only admin-verified teams are publicly visible
-  
+
     if (province) {
       request = request.eq('province', province);
     }
@@ -245,18 +248,18 @@ export class TeamService {
     if (size_member) {
       request = request.eq('size_member', size_member);
     }
-  
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-  
+
     const { data, error, count } = await request
       .order('created_at', { ascending: false })
       .range(from, to);
-  
+
     if (error) {
       throw new BadRequestException(error.message);
     }
-  
+
     return {
       data,
       pagination: {
@@ -266,5 +269,175 @@ export class TeamService {
         totalPages: count ? Math.ceil(count / limit) : 0,
       },
     };
+
+
+
   }
+
+  async requestToJoinTeam(userId: string, dto: RequestJoinTeamDto) {
+    const { team_id, request_message } = dto;
+  
+    const { data: currentUser, error: userError } = await this.supabase
+      .from('users')
+      .select('team_id, username')
+      .eq('id', userId)
+      .single();
+  
+    if (userError) {
+      throw new BadRequestException(Messages.cannotCheckUser);
+    }
+    if (currentUser?.team_id) {
+      throw new BadRequestException(Messages.alreadyInTeam);
+    }
+  
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('id, name, leader_id')
+      .eq('id', team_id)
+      .single();
+  
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+  
+    const { data: existingRequest } = await this.supabase
+      .from('team_join_requests')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('team_id', team_id)
+      .eq('status', 'PENDING')
+      .maybeSingle();
+  
+    if (existingRequest) {
+      throw new BadRequestException(Messages.joinRequestAlreadyPending);
+    }
+  
+    const { data, error } = await this.supabase
+      .from('team_join_requests')
+      .insert([{ user_id: userId, team_id, status: 'PENDING', request_message }])
+      .select()
+      .single();
+  
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  
+    // Notify the leader of the new join request
+    const { data: leader } = await this.supabase
+      .from('users')
+      .select('fcm_token')
+      .eq('id', team.leader_id)
+      .single();
+  
+    if (leader?.fcm_token) {
+      await this.firebaseService.sendPush(
+        leader.fcm_token,
+        'Yêu cầu tham gia đội mới',
+        `${currentUser.username || 'Một người dùng'} muốn tham gia đội ${team.name}`,
+      );
+    }
+  
+    return { success: true, message: Messages.joinRequestSent, data };
+  }
+
+  async getPendingJoinRequests(leaderUser: any) {
+    const leaderId = leaderUser.id;
+
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('id')
+      .eq('leader_id', leaderId)
+      .single();
+
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+
+    const { data, error } = await this.supabase
+      .from('team_join_requests')
+      .select(`
+        id, request_message, status, created_at,
+        users:user_id (
+          id, username, phone, avatar
+        )
+      `)
+      .eq('team_id', team.id)
+      .eq('status', 'PENDING')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return data;
+  }
+
+  async respondToJoinRequest(requestId: string, leaderUser: any, dto: RespondJoinRequestDto) {
+    const leaderId = leaderUser.id;
+    const { status, response_message } = dto;
+
+    const { data: joinRequest, error: requestError } = await this.supabase
+      .from('team_join_requests')
+      .select('*, team_rescue!inner(id, leader_id, name)')
+      .eq('id', requestId)
+      .single();
+
+    if (requestError || !joinRequest) {
+      throw new BadRequestException(Messages.joinRequestNotFound);
+    }
+
+    if (joinRequest.team_rescue.leader_id !== leaderId) {
+      throw new BadRequestException(Messages.notTeamLeader);
+    }
+
+    if (joinRequest.status !== 'PENDING') {
+      throw new BadRequestException(Messages.joinRequestAlreadyResponded);
+    }
+
+    const { error: updateError } = await this.supabase
+      .from('team_join_requests')
+      .update({
+        status,
+        response_message,
+        responded_at: new Date().toISOString(),
+        responded_by: leaderId,
+      })
+      .eq('id', requestId);
+
+    if (updateError) {
+      throw new BadRequestException(updateError.message);
+    }
+
+    if (status === 'ACCEPTED') {
+      const { error: userUpdateError } = await this.supabase
+        .from('users')
+        .update({ roles: 'VOLUNTEER', team_id: joinRequest.team_id })
+        .eq('id', joinRequest.user_id);
+
+      if (userUpdateError) {
+        throw new BadRequestException(userUpdateError.message);
+      }
+    }
+
+    const { data: requestingUser } = await this.supabase
+      .from('users')
+      .select('fcm_token')
+      .eq('id', joinRequest.user_id)
+      .single();
+
+    if (requestingUser?.fcm_token) {
+      const title = status === 'ACCEPTED' ? 'Yêu cầu được chấp nhận' : 'Yêu cầu bị từ chối';
+      const body = response_message || (status === 'ACCEPTED'
+        ? `Bạn đã được chấp nhận vào đội ${joinRequest.team_rescue.name}`
+        : `Yêu cầu tham gia đội ${joinRequest.team_rescue.name} đã bị từ chối`);
+
+      await this.firebaseService.sendPush(requestingUser.fcm_token, title, body);
+    }
+
+    return {
+      success: true,
+      message: status === 'ACCEPTED' ? Messages.joinRequestAccepted : Messages.joinRequestRejected,
+    };
+  }
+
 }

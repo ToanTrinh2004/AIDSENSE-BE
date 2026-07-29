@@ -38,7 +38,43 @@ export const Messages = {
   otpExpired: { vi: 'OTP đã hết hạn hoặc chưa được gửi.', en: 'OTP has expired or was never sent.' },
   otpInvalid: { vi: 'OTP không hợp lệ.', en: 'Invalid OTP.' },
   logoutSuccess: { vi: 'Đăng xuất thành công.', en: 'Logged out successfully.' },
-  provinceNotSet: { vi: 'Bạn chưa cập nhật tỉnh/thành phố',en: 'Your province is not set',},
-  cannotFetchUserProvince: { vi: 'Không thể lấy thông tin tỉnh/thành phố của bạn',en: 'Could not retrieve your province information',},
-  cannotFetchSameProvinceUsers: {vi: 'Không thể lấy danh sách người dùng cùng tỉnh/thành phố',en: 'Could not retrieve users in the same province',},
+  provinceNotSet: { vi: 'Bạn chưa cập nhật tỉnh/thành phố', en: 'Your province is not set', },
+  cannotFetchUserProvince: { vi: 'Không thể lấy thông tin tỉnh/thành phố của bạn', en: 'Could not retrieve your province information', },
+  cannotFetchSameProvinceUsers: { vi: 'Không thể lấy danh sách người dùng cùng tỉnh/thành phố', en: 'Could not retrieve users in the same province', },
+  alreadyInTeam: {
+    vi: 'Bạn đã thuộc một đội, không thể gửi yêu cầu tham gia đội khác',
+    en: 'You are already in a team and cannot join another',
+  },
+  teamNotFound: {
+    vi: 'Không tìm thấy đội',
+    en: 'Team not found',
+  },
+  joinRequestAlreadyPending: {
+    vi: 'Bạn đã có yêu cầu đang chờ duyệt cho đội này',
+    en: 'You already have a pending request for this team',
+  },
+  joinRequestSent: {
+    vi: 'Đã gửi yêu cầu tham gia đội',
+    en: 'Join request sent',
+  },
+  notTeamLeader: {
+    vi: 'Bạn không phải là trưởng đội này',
+    en: 'You are not the leader of this team',
+  },
+  joinRequestNotFound: {
+    vi: 'Không tìm thấy yêu cầu tham gia đội',
+    en: 'Join request not found',
+  },
+  joinRequestAlreadyResponded: {
+    vi: 'Yêu cầu này đã được xử lý',
+    en: 'This request has already been responded to',
+  },
+  joinRequestAccepted: {
+    vi: 'Đã chấp nhận yêu cầu tham gia đội',
+    en: 'Join request accepted',
+  },
+  joinRequestRejected: {
+    vi: 'Đã từ chối yêu cầu tham gia đội',
+    en: 'Join request rejected',
+  },
 };

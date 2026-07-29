@@ -16,6 +16,7 @@ import { ChatbotModule } from './chatbot/chatbot.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { RedisModule } from './redis/redis.module';
+import { FirebaseModule } from './firebase/FirebaseModule';
 
 @Module({
   imports: [
@@ -34,17 +35,18 @@ import { RedisModule } from './redis/redis.module';
     AdminModule,
     ChatbotModule,
     RedisModule,
+    FirebaseModule,
 
     ThrottlerModule.forRoot([
       {
         name: 'short',
-        ttl: 10000,   
-        limit: 10,    
+        ttl: 10000,
+        limit: 10,
       },
       {
         name: 'medium',
-        ttl: 60000,   
-        limit: 60,    
+        ttl: 60000,
+        limit: 60,
       },
     ]),
   ],
@@ -56,4 +58,4 @@ import { RedisModule } from './redis/redis.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
-export class AppModule {}
+export class AppModule { }

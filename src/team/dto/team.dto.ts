@@ -1,5 +1,5 @@
 
-import { IsString, IsOptional, IsIn, IsNotEmpty, IsEmail, Matches, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsNotEmpty, IsEmail, Matches, IsInt, Min, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -85,3 +85,33 @@ export class QueryTeamDto {
   limit?: number = 10;
 }
 export class UpdateTeamDto extends PartialType(CreateTeamDto) {}
+
+
+export class RequestJoinTeamDto {
+  @ApiProperty({ example: 'uuid-of-team', description: 'ID đội muốn tham gia' })
+  @IsNotEmpty({ message: 'Team ID không được để trống' })
+  @IsUUID()
+  team_id: string;
+
+  @ApiPropertyOptional({
+    example: 'Hi mình là ..., mình muốn tham gia đội cứu hộ của bạn...',
+    description: 'Lời nhắn gửi cho leader',
+  })
+  @IsOptional()
+  @IsString()
+  request_message?: string;
+}
+
+export class RespondJoinRequestDto {
+  @ApiProperty({ example: 'ACCEPTED', enum: ['ACCEPTED', 'REJECTED'], description: 'Phản hồi yêu cầu' })
+  @IsIn(['ACCEPTED', 'REJECTED'], { message: 'Trạng thái không hợp lệ' })
+  status: 'ACCEPTED' | 'REJECTED';
+
+  @ApiPropertyOptional({
+    example: 'Chào mừng bạn gia nhập đội!',
+    description: 'Lời nhắn phản hồi của leader',
+  })
+  @IsOptional()
+  @IsString()
+  response_message?: string;
+}

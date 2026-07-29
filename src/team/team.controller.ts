@@ -24,7 +24,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, QueryTeamDto } from './dto/team.dto';
+import { CreateTeamDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -122,5 +122,37 @@ export class TeamController {
   @Get()
   async findAllTeams(@Query() query: QueryTeamDto) {
     return this.teamService.findAllTeams(query);
+  }
+
+  @ApiOperation({ summary: 'Gửi yêu cầu tham gia đội' })
+  @ApiResponse({ status: 200, description: 'Gửi yêu cầu thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Post('join-request')
+  async requestToJoinTeam(@Body() dto: RequestJoinTeamDto, @Req() req) {
+    return this.teamService.requestToJoinTeam(req.user.id, dto);
+  }
+
+  @ApiOperation({ summary: 'Xem danh sách yêu cầu tham gia đội đang chờ duyệt' })
+  @ApiResponse({ status: 200, description: 'Danh sách yêu cầu đang chờ' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Get('join-requests/pending')
+  async getPendingJoinRequests(@Req() req) {
+    return this.teamService.getPendingJoinRequests(req.user);
+  }
+
+  @ApiOperation({ summary: 'Leader chấp nhận/từ chối yêu cầu tham gia đội' })
+  @ApiParam({ name: 'requestId', description: 'ID yêu cầu tham gia' })
+  @ApiResponse({ status: 200, description: 'Phản hồi yêu cầu thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Post('join-request/:requestId/respond')
+  async respondToJoinRequest(
+    @Param('requestId') requestId: string,
+    @Body() dto: RespondJoinRequestDto,
+    @Req() req,
+  ) {
+    return this.teamService.respondToJoinRequest(requestId, req.user, dto);
   }
 }

@@ -1,6 +1,6 @@
-import { IsOptional, IsString, IsDateString, IsInt, IsEmail, Matches } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsEmail, Matches, IsNotEmpty } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Nguyen Van A', description: 'Họ và tên' })
@@ -37,5 +37,8 @@ export class UpdateProfileDto {
   @IsString()
   address?: string;
 
- 
+  @ApiPropertyOptional({ example: 'TP. Hồ Chí Minh', description: 'Tỉnh/Thành phố' })
+  @IsOptional()
+  province?: string;
+
 }
