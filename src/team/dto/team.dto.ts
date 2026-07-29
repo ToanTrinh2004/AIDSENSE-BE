@@ -1,6 +1,7 @@
 
-import { IsString, IsOptional, IsIn, IsNotEmpty, IsEmail, Matches } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsNotEmpty, IsEmail, Matches, IsInt, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export enum TeamContactRole {
   LEADER = 'LEADER',           // Leader
@@ -53,5 +54,34 @@ export class CreateTeamDto {
   @IsIn([TeamContactRole.LEADER, TeamContactRole.VOLUNTEER], { message: 'Vai trò không hợp lệ' })
   position: TeamContactRole;
 }
+export class QueryTeamDto {
+  @ApiPropertyOptional({ example: 'TP. Hồ Chí Minh', description: 'Lọc theo tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  province?: string;
 
+  @ApiPropertyOptional({ example: 'Đội cứu hộ', description: 'Tìm theo tên đội (gần đúng)' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ example: '10', description: 'Lọc theo số lượng thành viên' })
+  @IsOptional()
+  @IsString()
+  size_member?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'Trang hiện tại', default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ example: 10, description: 'Số lượng mỗi trang', default: 10 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 10;
+}
 export class UpdateTeamDto extends PartialType(CreateTeamDto) {}

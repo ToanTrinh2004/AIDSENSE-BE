@@ -1,4 +1,3 @@
-// auth.service.ts
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -23,13 +22,17 @@ export class AuthService {
   private readonly OTP_VERIFIED_TTL = 600;
   private readonly SESSION_TTL = 86400; // 1 ngày, khớp với JWT expiresIn
 
+  // TODO: PRODUCTION — remove this flag and all `this.OTP_BYPASS` checks below
+  // before deploying. Set OTP_BYPASS=true only in local/dev .env for testing.
+  private readonly OTP_BYPASS = process.env.OTP_BYPASS === 'true';
+
   private checkIsExistingUser(phone: string) {
     return this.supabase.from('auth').select('*').eq('phone', phone).maybeSingle();
   }
 
   async signUp(dto: SignupDto) {
     const { phone, password, username, province } = dto;
-  
+
     const { data: existingUser, error: selectError } = await this.checkIsExistingUser(phone);
     if (selectError) {
       throw new BadRequestException(Messages.cannotCheckUser);
@@ -37,34 +40,39 @@ export class AuthService {
     if (existingUser) {
       throw new BadRequestException(Messages.phoneAlreadyRegistered);
     }
-  
+
     const hashedPassword = await bcrypt.hash(password, 10);
-  
+
     await this.redis.set(
       `pending_signup:${phone}`,
       JSON.stringify({ password: hashedPassword, username, province }),
       'EX',
       this.PENDING_SIGNUP_TTL,
     );
-  
+
+    // TODO: PRODUCTION — remove this if-block, always send real OTP
+    if (this.OTP_BYPASS) {
+      return { success: true, message: Messages.otpSentSignup };
+    }
+
     await this.smsService.sendOtp(phone);
-  
+
     return { success: true, message: Messages.otpSentSignup };
   }
-  
+
   private async finalizeSignUp(phone: string) {
     const pendingRaw = await this.redis.get(`pending_signup:${phone}`);
     if (!pendingRaw) {
       throw new BadRequestException(Messages.signupRequestExpired);
     }
     const { password, username, province } = JSON.parse(pendingRaw);
-  
+
     const { data: existingUser } = await this.checkIsExistingUser(phone);
     if (existingUser) {
       await this.redis.del(`pending_signup:${phone}`);
       throw new BadRequestException(Messages.phoneAlreadyRegistered);
     }
-  
+
     const { data, error } = await this.supabase
       .from('auth')
       .insert([{ phone, password }])
@@ -76,7 +84,7 @@ export class AuthService {
         en: `${Messages.cannotCreateAccount.en}: ${error.message}`,
       });
     }
-  
+
     const { error: userInsertError } = await this.supabase
       .from('users')
       .insert([{ id: data.userId, roles: 'GUEST', username, phone, province }]);
@@ -86,19 +94,20 @@ export class AuthService {
         en: `${Messages.cannotCreateProfile.en}: ${userInsertError.message}`,
       });
     }
-  
+
     await this.redis.del(`pending_signup:${phone}`);
-  
+
     const jti = randomUUID();
     await this.redis.set(`session:${data.userId}`, jti, 'EX', this.SESSION_TTL);
-  
+
     const access_token = await this.jwtService.signAsync(
       { id: data.userId, phone, role: 'GUEST', jti },
       { secret: jwtConstants.secret },
     );
-  
+
     return { success: true, message: Messages.signupSuccess, access_token };
   }
+
   async sendOtp(phone: string, type: OtpType) {
     if (type === OtpType.FORGOT_PASSWORD) {
       const { data: existingUser } = await this.checkIsExistingUser(phone);
@@ -113,12 +122,29 @@ export class AuthService {
       }
     }
 
+    // TODO: PRODUCTION — remove this if-block, always send real OTP
+    if (this.OTP_BYPASS) {
+      return { success: true, message: Messages.otpSent };
+    }
+
     await this.smsService.sendOtp(phone);
 
     return { success: true, message: Messages.otpSent };
   }
 
   async verifyOtp(phone: string, otp: number, type: OtpType) {
+    // TODO: PRODUCTION — remove this if-block entirely, always verify via smsService
+    if (this.OTP_BYPASS) {
+      if (type === OtpType.SIGNUP) {
+        return this.finalizeSignUp(phone);
+      }
+      if (type === OtpType.FORGOT_PASSWORD) {
+        await this.redis.set(`otp_verified:${phone}`, '1', 'EX', this.OTP_VERIFIED_TTL);
+        return { success: true, message: Messages.otpVerifiedSetNewPassword };
+      }
+      throw new BadRequestException(Messages.invalidOtpType);
+    }
+
     const result = await this.smsService.verifyOtp(phone, otp.toString());
 
     if (result === OtpVerifyResult.EXPIRED) {
@@ -236,6 +262,10 @@ export class AuthService {
   }
 
   async sendOtpToTeamLeader(phone: string) {
+    // TODO: PRODUCTION — remove this if-block
+    if (this.OTP_BYPASS) {
+      return { success: true, message: Messages.otpSent };
+    }
     try {
       await this.smsService.sendOtp(phone);
       return { success: true, message: Messages.otpSent };
@@ -245,6 +275,11 @@ export class AuthService {
   }
 
   async verifyOtpForTeamLeader(phone: string, otp: number) {
+    // TODO: PRODUCTION — remove this if-block, always verify via smsService
+    if (this.OTP_BYPASS) {
+      return { success: true, message: Messages.otpVerifySuccess };
+    }
+
     const result = await this.smsService.verifyOtp(phone, otp.toString());
 
     if (result === OtpVerifyResult.EXPIRED) {
@@ -256,6 +291,4 @@ export class AuthService {
 
     return { success: true, message: Messages.otpVerifySuccess };
   }
-
- 
 }

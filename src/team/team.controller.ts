@@ -24,7 +24,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto } from './dto/team.dto';
+import { CreateTeamDto, QueryTeamDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -114,5 +114,13 @@ export class TeamController {
   @Get('all-support')
   async getAllTeams(@Req() req, @Query('status') status: string) {
     return this.teamService.getSosByTeam(req.user, status);
+  }
+
+  @ApiOperation({ summary: 'Xem danh sách đội cứu hộ đã được duyệt (lọc, tìm kiếm, phân trang)' })
+  @ApiResponse({ status: 200, description: 'Danh sách đội cứu hộ đã được duyệt' })
+  @HttpCode(200)
+  @Get()
+  async findAllTeams(@Query() query: QueryTeamDto) {
+    return this.teamService.findAllTeams(query);
   }
 }

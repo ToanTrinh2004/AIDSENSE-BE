@@ -1,5 +1,5 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
-import { CreateTeamDto } from './dto/team.dto';
+import { CreateTeamDto, QueryTeamDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -225,6 +225,46 @@ export class TeamService {
     return {
       message: 'Lấy danh sách SOS thành công',
       data,
+    };
+  }
+
+  async findAllTeams(query: QueryTeamDto) {
+    const { province, name, size_member, page = 1, limit = 10 } = query;
+  
+    let request = this.supabase
+      .from('team_rescue')
+      .select('*', { count: 'exact' })
+      .eq('team_status', 'APPROVED'); // only admin-verified teams are publicly visible
+  
+    if (province) {
+      request = request.eq('province', province);
+    }
+    if (name) {
+      request = request.ilike('name', `%${name}%`);
+    }
+    if (size_member) {
+      request = request.eq('size_member', size_member);
+    }
+  
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+  
+    const { data, error, count } = await request
+      .order('created_at', { ascending: false })
+      .range(from, to);
+  
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  
+    return {
+      data,
+      pagination: {
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0,
+      },
     };
   }
 }
