@@ -69,13 +69,13 @@ export class TeamController {
 
 
   @ApiOperation({ summary: 'Xem chi tiết đội cứu hộ (chỉ đội đã duyệt)' })
-@ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
-@ApiResponse({ status: 200, description: 'Chi tiết đội cứu hộ' })
-@HttpCode(200)
-@Get(':teamId')
-async getTeamDetail(@Param('teamId') teamId: string) {
-  return this.teamService.getTeamDetail(teamId);
-}
+  @ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
+  @ApiResponse({ status: 200, description: 'Chi tiết đội cứu hộ' })
+  @HttpCode(200)
+  @Get('/detail/:teamId')
+  async getTeamDetail(@Param('teamId') teamId: string) {
+    return this.teamService.getTeamDetail(teamId);
+  }
   @ApiOperation({ summary: 'Nhận yêu cầu hỗ trợ SOS' })
   @ApiParam({ name: 'sosId', description: 'ID yêu cầu SOS' })
   @ApiResponse({ status: 200, description: 'Nhận hỗ trợ thành công' })
