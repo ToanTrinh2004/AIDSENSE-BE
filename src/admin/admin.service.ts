@@ -8,12 +8,16 @@ import { UpdateEventDto } from './dto/update-events-dto';
 import { stat } from 'fs';
 import { UpdateWeightDto } from './dto/update-weight.dto';
 import { UpdateUserDto } from './dto/update-user-dto';
+import { Messages } from 'src/utils/messages';
+import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
+import { FirebaseService } from 'src/firebase/FirebaseService';
 
 @Injectable()
 export class AdminService {
   constructor(
     private jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
+    private readonly firebaseService: FirebaseService,
   ) { }
 
   async getAllUsers(limit: number, page: number) {
@@ -361,6 +365,35 @@ export class AdminService {
     return {
       message: 'Weight type updated successfully',
       data,
+    };
+  }
+
+
+  async broadcastNotification(dto: BroadcastNotificationDto) {
+    const { title, body, data } = dto;
+  
+    const { data: users, error } = await this.supabase
+      .from('users')
+      .select('fcm_token_android, fcm_token_ios');
+  
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  
+    const tokens: string[] = [];
+    for (const u of users ?? []) {
+      if (u.fcm_token_android) tokens.push(u.fcm_token_android);
+      if (u.fcm_token_ios) tokens.push(u.fcm_token_ios);
+    }
+  
+    const result = await this.firebaseService.sendBroadcast(tokens, title, body, data);
+  
+    return {
+      success: true,
+      message: Messages.broadcastSent,
+      total_devices: tokens.length,
+      sent: result.successCount,
+      failed: result.failureCount,
     };
   }
     

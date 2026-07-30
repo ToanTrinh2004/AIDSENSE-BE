@@ -164,4 +164,13 @@ export class TeamController {
   ) {
     return this.teamService.respondToJoinRequest(requestId, req.user, dto);
   }
+
+  @ApiOperation({ summary: 'Xem yêu cầu tham gia đội hiện tại' })
+  @ApiResponse({ status: 200, description: 'Thông tin yêu cầu tham gia đội hiện tại' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Get('join-request/current')
+  async getCurrentJoinRequest(@Req() req) {
+    return this.teamService.getCurrentJoinRequest(req.user.id);
+  }
 }

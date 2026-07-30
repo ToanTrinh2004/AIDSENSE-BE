@@ -1,4 +1,4 @@
-import { Inject, Injectable, HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, HttpException, HttpStatus, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -6,6 +6,7 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import Redis from 'ioredis';
 import { Messages } from 'src/utils/messages';
 import { FirebaseService } from 'src/firebase/FirebaseService';
+import { NotificationPayloadDto, NotificationType } from 'src/firebase/NotificationPayloadDto';
 
 @Injectable()
 export class TeamService {
@@ -238,20 +239,20 @@ export class TeamService {
       .eq('id', teamId)
       .eq('team_status', 'APPROVED')
       .single();
-  
+
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-  
+
     const { data: members, error: membersError } = await this.supabase
       .from('users')
       .select('id, username, phone, avatar, roles')
       .eq('team_id', teamId);
-  
+
     if (membersError) {
       throw new BadRequestException(membersError.message);
     }
-  
+
     return {
       ...team,
       members: members ?? [],
@@ -350,16 +351,17 @@ export class TeamService {
     }
 
     // Notify the leader of the new join request
-    const { data: leader } = await this.supabase
-      .from('users')
-      .select('fcm_token')
-      .eq('id', team.leader_id)
-      .single();
+    const payload = new NotificationPayloadDto();
+    payload.type = NotificationType.JOIN_REQUEST;
+    payload.action = 'created';
+    payload.request_id = data.id;
+    payload.team_id = team.id;
 
     await this.firebaseService.sendPushToUser(
       team.leader_id,
       'Yêu cầu tham gia đội mới',
       `${currentUser.username || 'Một người dùng'} muốn tham gia đội ${team.name}`,
+      payload,
     );
 
     return { success: true, message: Messages.joinRequestSent, data };
@@ -368,20 +370,20 @@ export class TeamService {
   async getPendingJoinRequests(leaderUser: any, query: QueryJoinRequestsDto) {
     const leaderId = leaderUser.id;
     const { page = 1, limit = 10 } = query;
-  
+
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
       .select('id')
       .eq('leader_id', leaderId)
       .single();
-  
+
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-  
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-  
+
     const { data, error, count } = await this.supabase
       .from('team_join_requests')
       .select(`
@@ -394,11 +396,11 @@ export class TeamService {
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false })
       .range(from, to);
-  
+
     if (error) {
       throw new BadRequestException(error.message);
     }
-  
+
     return {
       data,
       pagination: {
@@ -457,22 +459,47 @@ export class TeamService {
       }
     }
 
-    const { data: requestingUser } = await this.supabase
-      .from('users')
-      .select('fcm_token')
-      .eq('id', joinRequest.user_id)
-      .single();
-
     const title = status === 'ACCEPTED' ? 'Yêu cầu được chấp nhận' : 'Yêu cầu bị từ chối';
     const body = response_message || (status === 'ACCEPTED'
       ? `Bạn đã được chấp nhận vào đội ${joinRequest.team_rescue.name}`
       : `Yêu cầu tham gia đội ${joinRequest.team_rescue.name} đã bị từ chối`);
 
-    await this.firebaseService.sendPushToUser(joinRequest.user_id, title, body);
+    const payload = new NotificationPayloadDto();
+    payload.type = NotificationType.JOIN_REQUEST;
+    payload.action = status.toLowerCase();
+    payload.request_id = requestId;
+    payload.team_id = joinRequest.team_id;
+
+    await this.firebaseService.sendPushToUser(joinRequest.user_id, title, body, payload);
+
     return {
       success: true,
       message: status === 'ACCEPTED' ? Messages.joinRequestAccepted : Messages.joinRequestRejected,
     };
   }
 
+  async getCurrentJoinRequest(userId: string) {
+    const { data, error } = await this.supabase
+      .from('join_request')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'PENDING')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    if (!data) {
+      throw new NotFoundException('Không có yêu cầu tham gia đội hiện tại');
+    }
+
+    return {
+      success: true,
+      statusCode: 200,
+      data,
+    };
+  }
 }

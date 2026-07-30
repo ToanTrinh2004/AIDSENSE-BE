@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
@@ -9,12 +9,15 @@ import { UpdateWeightDto } from './dto/update-weight.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { RolesGuard } from 'src/roles.guard';
 import { Roles } from 'src/roles.decorator';
+import { Public } from 'src/public.decorator';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
 
 @UseGuards(AuthGuard, RolesGuard)
 @Roles('ADMIN')
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('users')
   getAllUsers(
@@ -26,7 +29,7 @@ export class AdminController {
       Number(page),
     );
   }
-  
+
   @Get('teams')
   getAllTeams(
     @Query('limit') limit = '15',
@@ -38,12 +41,12 @@ export class AdminController {
     );
   }
   @Patch('update/events/:eventId')
-  updateEventByAdmin(@Param('eventId') eventId: string, @Body() updateData: UpdateEventDto)  {
+  updateEventByAdmin(@Param('eventId') eventId: string, @Body() updateData: UpdateEventDto) {
     return this.adminService.updateEventByAdmin(eventId, updateData);
   }
   @Patch('update/events/status/:eventId')
-  updateEventStatusByAdmin(@Param('eventId') eventId: string, @Body() body: { status: string })  {
-    return this.adminService.updateEventStatus(eventId,body.status);
+  updateEventStatusByAdmin(@Param('eventId') eventId: string, @Body() body: { status: string }) {
+    return this.adminService.updateEventStatus(eventId, body.status);
   }
   @Patch('update/users/:userId')
   updateUserByAdmin(
@@ -52,28 +55,28 @@ export class AdminController {
   ) {
     return this.adminService.updateUser(userId, updateUserDto);
   }
-  
+
   @Patch('update/teams/:teamId')
   updateTeamByAdmin(@Param('teamId') teamId: string, @Body() updateTeamDto: CreateTeamDto) {
     return this.adminService.updateTeam(teamId, updateTeamDto);
   }
   @Patch('update/teams/status/:teamId')
-  updateTeamStatusByAdmin(@Param('teamId') teamId: string, @Body() body: { status: string })  {
-    return this.adminService.updateTeamStatus(teamId,body.status);
+  updateTeamStatusByAdmin(@Param('teamId') teamId: string, @Body() body: { status: string }) {
+    return this.adminService.updateTeamStatus(teamId, body.status);
   }
- @Get('all-events')
+  @Get('all-events')
   getEvents(@Query('limit') limit = '15',
-  @Query('page') page = '1',) {
-    return this.adminService.getAllEvents(Number(limit),Number(page));
+    @Query('page') page = '1',) {
+    return this.adminService.getAllEvents(Number(limit), Number(page));
   }
   @Get('event/requests')
   getEventRequests(@Query('limit') limit = '15',
-  @Query('page') page = '1',) {
-    return this.adminService.getAllRequestedEvents(Number(limit),Number(page));
+    @Query('page') page = '1',) {
+    return this.adminService.getAllRequestedEvents(Number(limit), Number(page));
   }
   @Post('event/apply-ai-fix')
   applyAiFixToEvent(@Body('eventId') eventId: string, @Body('eventAiFixedId') eventAiFixedId: string) {
-    return this.adminService.applyAiFixedsos(eventId,eventAiFixedId);
+    return this.adminService.applyAiFixedsos(eventId, eventAiFixedId);
   }
   @Get('weights')
   getWeights() {
@@ -87,11 +90,19 @@ export class AdminController {
   updateWeights(@Body() dto: UpdateWeightDto) {
     return this.adminService.updateWeightedScores(dto);
   }
-  
+
   @Patch('weights-types/:id')
   updateWeightByType(@Param('id') id: string, @Body('weight') weight: number) {
     return this.adminService.updateWeightTypes(id, weight);
   }
 
 
+  @Public()
+  @ApiOperation({ summary: 'Gửi thông báo tới tất cả người dùng (Admin)' })
+  @ApiResponse({ status: 200, description: 'Gửi thông báo thành công' })
+  @HttpCode(200)
+  @Post('admin/broadcast')
+  async broadcastNotification(@Body() dto: BroadcastNotificationDto) {
+    return this.adminService.broadcastNotification(dto);
+  }
 }

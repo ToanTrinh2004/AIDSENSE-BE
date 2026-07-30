@@ -81,4 +81,8 @@ export const Messages = {
     vi: 'Cập nhật FCM token thành công',
     en: 'FCM token updated successfully',
   },
+  broadcastSent: {
+    vi: 'Gửi thông báo hàng loạt thành công',
+    en: 'Broadcast notification sent successfully',
+  },
 };
