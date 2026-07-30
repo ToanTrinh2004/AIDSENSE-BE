@@ -231,6 +231,33 @@ export class TeamService {
     };
   }
 
+  async getTeamDetail(teamId: string) {
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('*')
+      .eq('id', teamId)
+      .eq('team_status', 'APPROVED')
+      .single();
+  
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+  
+    const { data: members, error: membersError } = await this.supabase
+      .from('users')
+      .select('id, username, phone, avatar, roles')
+      .eq('team_id', teamId);
+  
+    if (membersError) {
+      throw new BadRequestException(membersError.message);
+    }
+  
+    return {
+      ...team,
+      members: members ?? [],
+      total_members: members?.length ?? 0,
+    };
+  }
   async findAllTeams(query: QueryTeamDto) {
     const { province, name, size_member, page = 1, limit = 10 } = query;
 
