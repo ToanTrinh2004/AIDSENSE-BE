@@ -77,4 +77,8 @@ export const Messages = {
     vi: 'Đã từ chối yêu cầu tham gia đội',
     en: 'Join request rejected',
   },
+  fcmTokenUpdated: {
+    vi: 'Cập nhật FCM token thành công',
+    en: 'FCM token updated successfully',
+  },
 };

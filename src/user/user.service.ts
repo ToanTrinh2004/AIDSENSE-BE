@@ -128,4 +128,18 @@ export class UserService {
   
     return data;
   }
+  async updateFcmToken(user: any, fcmToken: string) {
+    const userId = user.id;
+  
+    const { error } = await this.supabase
+      .from('users')
+      .update({ fcm_token: fcmToken })
+      .eq('id', userId);
+  
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  
+    return { success: true, message: Messages.fcmTokenUpdated };
+  }
 }

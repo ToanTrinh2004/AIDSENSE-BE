@@ -42,3 +42,10 @@ export class UpdateProfileDto {
   province?: string;
 
 }
+
+export class UpdateFcmTokenDto {
+  @ApiProperty({ example: 'e1a2b3c4...', description: 'FCM device token' })
+  @IsNotEmpty({ message: 'FCM token không được để trống' })
+  @IsString()
+  fcm_token: string;
+}

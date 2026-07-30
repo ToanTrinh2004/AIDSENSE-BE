@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, MinLength, Matches } from 'class-validator';
+import { IsEnum, IsNotEmpty, MinLength, Matches, IsString } from 'class-validator';
 
 export enum OtpType {
   SIGNUP = 'signup',
@@ -91,3 +91,4 @@ export class TeamVerifyOtpDto {
   @IsNotEmpty({ message: 'OTP không được để trống' })
   otp: number;
 }
+

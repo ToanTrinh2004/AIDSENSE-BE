@@ -21,9 +21,10 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { UpdateProfileDto } from './dto/user.dto';
+import { UpdateFcmTokenDto, UpdateProfileDto } from './dto/user.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
+
 
 @ApiTags('User')
 @ApiBearerAuth()
@@ -94,4 +95,12 @@ export class UserController {
   async findUsersBySameProvince(@Req() req) {
     return this.userService.findUsersBySameProvince(req.user);
   }
+  @ApiOperation({ summary: 'Cập nhật FCM token' })
+@ApiResponse({ status: 200, description: 'Cập nhật thành công' })
+@HttpCode(200)
+@UseGuards(AuthGuard)
+@Patch('fcm-token')
+async updateFcmToken(@Req() req, @Body() dto: UpdateFcmTokenDto) {
+  return this.userService.updateFcmToken(req.user, dto.fcm_token);
+}
 }
