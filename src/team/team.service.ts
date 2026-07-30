@@ -1,5 +1,5 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException } from '@nestjs/common';
-import { CreateTeamDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
+import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -365,36 +365,49 @@ export class TeamService {
     return { success: true, message: Messages.joinRequestSent, data };
   }
 
-  async getPendingJoinRequests(leaderUser: any) {
+  async getPendingJoinRequests(leaderUser: any, query: QueryJoinRequestsDto) {
     const leaderId = leaderUser.id;
-
+    const { page = 1, limit = 10 } = query;
+  
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
       .select('id')
       .eq('leader_id', leaderId)
       .single();
-
+  
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-
-    const { data, error } = await this.supabase
+  
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+  
+    const { data, error, count } = await this.supabase
       .from('team_join_requests')
       .select(`
         id, request_message, status, created_at,
         users:user_id (
           id, username, phone, avatar
         )
-      `)
+      `, { count: 'exact' })
       .eq('team_id', team.id)
       .eq('status', 'PENDING')
-      .order('created_at', { ascending: false });
-
+      .order('created_at', { ascending: false })
+      .range(from, to);
+  
     if (error) {
       throw new BadRequestException(error.message);
     }
-
-    return data;
+  
+    return {
+      data,
+      pagination: {
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0,
+      },
+    };
   }
 
   async respondToJoinRequest(requestId: string, leaderUser: any, dto: RespondJoinRequestDto) {

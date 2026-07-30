@@ -24,7 +24,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
+import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -147,8 +147,8 @@ export class TeamController {
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Get('join-requests/pending')
-  async getPendingJoinRequests(@Req() req) {
-    return this.teamService.getPendingJoinRequests(req.user);
+  async getPendingJoinRequests(@Req() req, @Query() query: QueryJoinRequestsDto) {
+    return this.teamService.getPendingJoinRequests(req.user, query);
   }
 
   @ApiOperation({ summary: 'Leader chấp nhận/từ chối yêu cầu tham gia đội' })
