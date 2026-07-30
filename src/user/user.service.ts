@@ -128,12 +128,13 @@ export class UserService {
   
     return data;
   }
-  async updateFcmToken(user: any, fcmToken: string) {
+  async updateFcmToken(user: any, fcmToken: string, platform: 'android' | 'ios') {
     const userId = user.id;
+    const column = platform === 'ios' ? 'fcm_token_ios' : 'fcm_token_android';
   
     const { error } = await this.supabase
       .from('users')
-      .update({ fcm_token: fcmToken })
+      .update({ [column]: fcmToken })
       .eq('id', userId);
   
     if (error) {

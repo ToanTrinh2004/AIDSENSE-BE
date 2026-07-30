@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDateString, IsInt, IsEmail, Matches, IsNotEmpty } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsEmail, Matches, IsNotEmpty, IsIn } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -48,4 +48,8 @@ export class UpdateFcmTokenDto {
   @IsNotEmpty({ message: 'FCM token không được để trống' })
   @IsString()
   fcm_token: string;
+
+  @ApiProperty({ example: 'android', enum: ['android', 'ios'], description: 'Nền tảng thiết bị' })
+  @IsIn(['android', 'ios'], { message: 'Platform không hợp lệ' })
+  platform: 'android' | 'ios';
 }

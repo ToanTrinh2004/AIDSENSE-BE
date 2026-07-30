@@ -276,30 +276,30 @@ export class TeamService {
 
   async requestToJoinTeam(userId: string, dto: RequestJoinTeamDto) {
     const { team_id, request_message } = dto;
-  
+
     const { data: currentUser, error: userError } = await this.supabase
       .from('users')
       .select('team_id, username')
       .eq('id', userId)
       .single();
-  
+
     if (userError) {
       throw new BadRequestException(Messages.cannotCheckUser);
     }
     if (currentUser?.team_id) {
       throw new BadRequestException(Messages.alreadyInTeam);
     }
-  
+
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
       .select('id, name, leader_id')
       .eq('id', team_id)
       .single();
-  
+
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-  
+
     const { data: existingRequest } = await this.supabase
       .from('team_join_requests')
       .select('id')
@@ -307,36 +307,34 @@ export class TeamService {
       .eq('team_id', team_id)
       .eq('status', 'PENDING')
       .maybeSingle();
-  
+
     if (existingRequest) {
       throw new BadRequestException(Messages.joinRequestAlreadyPending);
     }
-  
+
     const { data, error } = await this.supabase
       .from('team_join_requests')
       .insert([{ user_id: userId, team_id, status: 'PENDING', request_message }])
       .select()
       .single();
-  
+
     if (error) {
       throw new BadRequestException(error.message);
     }
-  
+
     // Notify the leader of the new join request
     const { data: leader } = await this.supabase
       .from('users')
       .select('fcm_token')
       .eq('id', team.leader_id)
       .single();
-  
-    if (leader?.fcm_token) {
-      await this.firebaseService.sendPush(
-        leader.fcm_token,
-        'Yêu cầu tham gia đội mới',
-        `${currentUser.username || 'Một người dùng'} muốn tham gia đội ${team.name}`,
-      );
-    }
-  
+
+    await this.firebaseService.sendPushToUser(
+      team.leader_id,
+      'Yêu cầu tham gia đội mới',
+      `${currentUser.username || 'Một người dùng'} muốn tham gia đội ${team.name}`,
+    );
+
     return { success: true, message: Messages.joinRequestSent, data };
   }
 
@@ -425,15 +423,12 @@ export class TeamService {
       .eq('id', joinRequest.user_id)
       .single();
 
-    if (requestingUser?.fcm_token) {
-      const title = status === 'ACCEPTED' ? 'Yêu cầu được chấp nhận' : 'Yêu cầu bị từ chối';
-      const body = response_message || (status === 'ACCEPTED'
-        ? `Bạn đã được chấp nhận vào đội ${joinRequest.team_rescue.name}`
-        : `Yêu cầu tham gia đội ${joinRequest.team_rescue.name} đã bị từ chối`);
+    const title = status === 'ACCEPTED' ? 'Yêu cầu được chấp nhận' : 'Yêu cầu bị từ chối';
+    const body = response_message || (status === 'ACCEPTED'
+      ? `Bạn đã được chấp nhận vào đội ${joinRequest.team_rescue.name}`
+      : `Yêu cầu tham gia đội ${joinRequest.team_rescue.name} đã bị từ chối`);
 
-      await this.firebaseService.sendPush(requestingUser.fcm_token, title, body);
-    }
-
+    await this.firebaseService.sendPushToUser(joinRequest.user_id, title, body);
     return {
       success: true,
       message: status === 'ACCEPTED' ? Messages.joinRequestAccepted : Messages.joinRequestRejected,

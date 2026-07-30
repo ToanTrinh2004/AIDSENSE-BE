@@ -256,17 +256,18 @@ export class AuthService {
     return { success: true, message: Messages.passwordUpdateSuccess, access_token };
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, platform: 'android' | 'ios') {
     await this.redis.del(`session:${userId}`);
+  
+    const column = platform === 'ios' ? 'fcm_token_ios' : 'fcm_token_android';
   
     const { error } = await this.supabase
       .from('users')
-      .update({ fcm_token: null })
+      .update({ [column]: null })
       .eq('id', userId);
   
     if (error) {
-      // don't block logout if this fails — session invalidation is the critical part
-      console.error('Failed to clear fcm_token on logout:', error.message);
+      console.error('Failed to clear fcm token on logout:', error.message);
     }
   
     return { success: true, message: Messages.logoutSuccess };

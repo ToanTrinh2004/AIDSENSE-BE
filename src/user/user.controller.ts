@@ -101,6 +101,6 @@ export class UserController {
 @UseGuards(AuthGuard)
 @Patch('fcm-token')
 async updateFcmToken(@Req() req, @Body() dto: UpdateFcmTokenDto) {
-  return this.userService.updateFcmToken(req.user, dto.fcm_token);
+  return this.userService.updateFcmToken(req.user, dto.fcm_token, dto.platform);
 }
 }

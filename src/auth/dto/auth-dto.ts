@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, MinLength, Matches, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEnum, IsNotEmpty, MinLength, Matches, IsString, IsOptional, IsIn } from 'class-validator';
 
 export enum OtpType {
   SIGNUP = 'signup',
@@ -92,3 +92,13 @@ export class TeamVerifyOtpDto {
   otp: number;
 }
 
+export class LogoutDto {
+  @ApiPropertyOptional({ example: 'device-uuid-here' })
+  @IsOptional()
+  @IsString()
+  device_id?: string;
+
+  @ApiProperty({ example: 'android', enum: ['android', 'ios'] })
+  @IsIn(['android', 'ios'])
+  platform: 'android' | 'ios';
+}
