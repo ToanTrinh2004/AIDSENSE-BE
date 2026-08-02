@@ -101,7 +101,7 @@ export class AdminController {
   @ApiOperation({ summary: 'Gửi thông báo tới tất cả người dùng (Admin)' })
   @ApiResponse({ status: 200, description: 'Gửi thông báo thành công' })
   @HttpCode(200)
-  @Post('admin/broadcast')
+  @Post('/broadcast')
   async broadcastNotification(@Body() dto: BroadcastNotificationDto) {
     return this.adminService.broadcastNotification(dto);
   }
