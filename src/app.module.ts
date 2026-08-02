@@ -17,6 +17,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { RedisModule } from './redis/redis.module';
 import { FirebaseModule } from './firebase/FirebaseModule';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -49,6 +50,8 @@ import { FirebaseModule } from './firebase/FirebaseModule';
         limit: 60,
       },
     ]),
+
+    NotificationModule,
   ],
 
   controllers: [AppController],

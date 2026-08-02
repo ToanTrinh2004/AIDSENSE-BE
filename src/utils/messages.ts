@@ -85,4 +85,8 @@ export const Messages = {
     vi: 'Gửi thông báo hàng loạt thành công',
     en: 'Broadcast notification sent successfully',
   },
+  notificationNotFound: {
+    vi: 'Không tìm thấy thông báo',
+    en: 'Notification not found',
+  },
 };

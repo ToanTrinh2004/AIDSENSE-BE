@@ -6,7 +6,7 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import Redis from 'ioredis';
 import { Messages } from 'src/utils/messages';
 import { FirebaseService } from 'src/firebase/FirebaseService';
-import { NotificationPayloadDto, NotificationType } from 'src/firebase/NotificationPayloadDto';
+import { NotificationService } from 'src/notification/notification.service';
 
 @Injectable()
 export class TeamService {
@@ -15,6 +15,7 @@ export class TeamService {
     private readonly cloudinaryService: CloudinaryService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly firebaseService: FirebaseService,
+    private readonly notificationService: NotificationService
   ) { }
 
   async createTeam(
@@ -176,7 +177,7 @@ export class TeamService {
       throw new HttpException('Team không tồn tại hoặc chưa được phê duyệt', HttpStatus.BAD_REQUEST);
     }
 
-    return data.id; // teamId
+    return data.id; 
   }
 
   private async validateSosStatus(sosId: string, expectedStatus: string) {
@@ -265,7 +266,7 @@ export class TeamService {
     let request = this.supabase
       .from('team_rescue')
       .select('*', { count: 'exact' })
-      .eq('team_status', 'APPROVED'); // only admin-verified teams are publicly visible
+      .eq('team_status', 'APPROVED'); 
 
     if (province) {
       request = request.eq('province', province);
@@ -304,30 +305,30 @@ export class TeamService {
 
   async requestToJoinTeam(userId: string, dto: RequestJoinTeamDto) {
     const { team_id, request_message } = dto;
-
+  
     const { data: currentUser, error: userError } = await this.supabase
       .from('users')
-      .select('team_id, username')
+      .select('team_id, username, phone')
       .eq('id', userId)
       .single();
-
+  
     if (userError) {
       throw new BadRequestException(Messages.cannotCheckUser);
     }
     if (currentUser?.team_id) {
       throw new BadRequestException(Messages.alreadyInTeam);
     }
-
+  
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
       .select('id, name, leader_id')
       .eq('id', team_id)
       .single();
-
+  
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-
+  
     const { data: existingRequest } = await this.supabase
       .from('team_join_requests')
       .select('id')
@@ -335,35 +336,42 @@ export class TeamService {
       .eq('team_id', team_id)
       .eq('status', 'PENDING')
       .maybeSingle();
-
+  
     if (existingRequest) {
       throw new BadRequestException(Messages.joinRequestAlreadyPending);
     }
-
+  
     const { data, error } = await this.supabase
       .from('team_join_requests')
       .insert([{ user_id: userId, team_id, status: 'PENDING', request_message }])
       .select()
       .single();
-
+  
     if (error) {
       throw new BadRequestException(error.message);
     }
+  
 
-    // Notify the leader of the new join request
-    const payload = new NotificationPayloadDto();
-    payload.type = NotificationType.JOIN_REQUEST;
-    payload.action = 'created';
-    payload.request_id = data.id;
-    payload.team_id = team.id;
-
-    await this.firebaseService.sendPushToUser(
-      team.leader_id,
-      'Yêu cầu tham gia đội mới',
-      `${currentUser.username || 'Một người dùng'} muốn tham gia đội ${team.name}`,
-      payload,
-    );
-
+    await this.notificationService.createAndSend({
+      userId: team.leader_id,
+      title: 'Yêu cầu tham gia đội mới',
+      content: `${currentUser.username || 'Một người dùng'} muốn tham gia đội ${team.name}`,
+      type: 'join_request',
+      action: 'created',
+      requestId: data.id,
+      data: {
+        team_id: team.id,
+        team_name: team.name,
+        user: {
+          id: userId,
+          username: currentUser.username,
+          phone: currentUser.phone,
+          reason: request_message,
+          time: data.created_at,
+        },
+      },
+    });
+  
     return { success: true, message: Messages.joinRequestSent, data };
   }
 
@@ -415,25 +423,25 @@ export class TeamService {
   async respondToJoinRequest(requestId: string, leaderUser: any, dto: RespondJoinRequestDto) {
     const leaderId = leaderUser.id;
     const { status, response_message } = dto;
-
+  
     const { data: joinRequest, error: requestError } = await this.supabase
       .from('team_join_requests')
-      .select('*, team_rescue!inner(id, leader_id, name)')
+      .select('*, team_rescue!inner(id, leader_id, name, phone)')
       .eq('id', requestId)
       .single();
-
+  
     if (requestError || !joinRequest) {
       throw new BadRequestException(Messages.joinRequestNotFound);
     }
-
+  
     if (joinRequest.team_rescue.leader_id !== leaderId) {
       throw new BadRequestException(Messages.notTeamLeader);
     }
-
+  
     if (joinRequest.status !== 'PENDING') {
       throw new BadRequestException(Messages.joinRequestAlreadyResponded);
     }
-
+  
     const { error: updateError } = await this.supabase
       .from('team_join_requests')
       .update({
@@ -443,35 +451,49 @@ export class TeamService {
         responded_by: leaderId,
       })
       .eq('id', requestId);
-
+  
     if (updateError) {
       throw new BadRequestException(updateError.message);
     }
-
+  
     if (status === 'ACCEPTED') {
       const { error: userUpdateError } = await this.supabase
         .from('users')
         .update({ roles: 'VOLUNTEER', team_id: joinRequest.team_id })
         .eq('id', joinRequest.user_id);
-
+  
       if (userUpdateError) {
         throw new BadRequestException(userUpdateError.message);
       }
     }
-
+  
+    const { data: leaderInfo } = await this.supabase
+      .from('users')
+      .select('username')
+      .eq('id', leaderId)
+      .single();
+  
     const title = status === 'ACCEPTED' ? 'Yêu cầu được chấp nhận' : 'Yêu cầu bị từ chối';
     const body = response_message || (status === 'ACCEPTED'
       ? `Bạn đã được chấp nhận vào đội ${joinRequest.team_rescue.name}`
       : `Yêu cầu tham gia đội ${joinRequest.team_rescue.name} đã bị từ chối`);
-
-    const payload = new NotificationPayloadDto();
-    payload.type = NotificationType.JOIN_REQUEST;
-    payload.action = status.toLowerCase();
-    payload.request_id = requestId;
-    payload.team_id = joinRequest.team_id;
-
-    await this.firebaseService.sendPushToUser(joinRequest.user_id, title, body, payload);
-
+  
+    await this.notificationService.createAndSend({
+      userId: joinRequest.user_id,
+      title,
+      content: body,
+      type: 'join_request',
+      action: status.toLowerCase(),
+      requestId,
+      data: {
+        team_id: joinRequest.team_id,
+        team_name: joinRequest.team_rescue.name,
+        leader_name: leaderInfo?.username,
+        leader_phone: joinRequest.team_rescue.phone,
+        reason: response_message,
+      },
+    });
+  
     return {
       success: true,
       message: status === 'ACCEPTED' ? Messages.joinRequestAccepted : Messages.joinRequestRejected,
@@ -480,7 +502,7 @@ export class TeamService {
 
   async getCurrentJoinRequest(userId: string) {
     const { data, error } = await this.supabase
-      .from('join_request')
+      .from('team_join_requests')
       .select('*')
       .eq('user_id', userId)
       .eq('status', 'PENDING')

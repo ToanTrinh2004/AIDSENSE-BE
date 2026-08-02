@@ -2,7 +2,6 @@ import { Inject, Injectable } from '@nestjs/common';
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { NotificationPayloadDto } from './NotificationPayloadDto';
 
 @Injectable()
 export class FirebaseService {
@@ -42,26 +41,24 @@ export class FirebaseService {
       console.error('Error sending push notification:', error.message);
     }
   }
-  
+
   async sendPushToUser(
     userId: string,
     title: string,
     body: string,
-    payload?: NotificationPayloadDto,
+    data?: Record<string, string>,
   ) {
     const { data: user, error } = await this.supabase
       .from('users')
       .select('fcm_token_android, fcm_token_ios')
       .eq('id', userId)
       .single();
-  
+
     if (error || !user) {
       console.error('Failed to look up user for push notification:', error?.message);
       return;
     }
-  
-    const data = payload?.toRecord();
-  
+
     if (user.fcm_token_android) {
       await this.sendPush(user.fcm_token_android, title, body, data);
     }
@@ -74,12 +71,11 @@ export class FirebaseService {
     if (tokens.length === 0) {
       return { successCount: 0, failureCount: 0 };
     }
-  
-    
+
     const chunkSize = 500;
     let successCount = 0;
     let failureCount = 0;
-  
+
     for (let i = 0; i < tokens.length; i += chunkSize) {
       const chunk = tokens.slice(i, i + chunkSize);
       try {
@@ -95,7 +91,7 @@ export class FirebaseService {
         failureCount += chunk.length;
       }
     }
-  
+
     return { successCount, failureCount };
   }
 }
