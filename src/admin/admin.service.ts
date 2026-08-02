@@ -5,19 +5,19 @@ import { JwtService } from '@nestjs/jwt';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CreateTeamDto } from 'src/team/dto/team.dto';
 import { UpdateEventDto } from './dto/update-events-dto';
-import { stat } from 'fs';
 import { UpdateWeightDto } from './dto/update-weight.dto';
 import { UpdateUserDto } from './dto/update-user-dto';
 import { Messages } from 'src/utils/messages';
+
+import { NotificationService } from 'src/notification/notification.service';
 import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
-import { FirebaseService } from 'src/firebase/FirebaseService';
 
 @Injectable()
 export class AdminService {
   constructor(
     private jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private readonly firebaseService: FirebaseService,
+    private readonly notificationService: NotificationService,
   ) { }
 
   async getAllUsers(limit: number, page: number) {
@@ -368,60 +368,7 @@ export class AdminService {
     };
   }
 
-
   async broadcastNotification(dto: BroadcastNotificationDto) {
-    const { title, content, image_url } = dto;
-  
-    const { data: users, error } = await this.supabase
-      .from('users')
-      .select('id, fcm_token_android, fcm_token_ios');
-  
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
-  
-    if (!users || users.length === 0) {
-      return { success: true, message: Messages.broadcastSent, total_users: 0, sent: 0, failed: 0 };
-    }
-  
-    
-    const notificationRows = users.map((u) => ({
-      user_id: u.id,
-      title,
-      content,
-      image_url,
-      type: 'announcement',
-      action: 'broadcast',
-    }));
-  
-    const { error: insertError } = await this.supabase
-      .from('notifications')
-      .insert(notificationRows);
-  
-    if (insertError) {
-      throw new BadRequestException(insertError.message);
-    }
-  
-    
-    const tokens: string[] = [];
-    for (const u of users) {
-      if (u.fcm_token_android) tokens.push(u.fcm_token_android);
-      if (u.fcm_token_ios) tokens.push(u.fcm_token_ios);
-    }
-  
-    const result = await this.firebaseService.sendBroadcast(tokens, title, content, {
-      type: 'announcement',
-      action: 'broadcast',
-    });
-  
-    return {
-      success: true,
-      message: Messages.broadcastSent,
-      total_users: users.length,
-      total_devices: tokens.length,
-      sent: result.successCount,
-      failed: result.failureCount,
-    };
+    return this.notificationService.broadcastNotification(dto);
   }
-    
 }

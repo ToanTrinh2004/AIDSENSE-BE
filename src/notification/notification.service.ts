@@ -4,6 +4,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Messages } from '../utils/messages';
 import { QueryNotificationDto } from './dto/notification.dto';
 import { FirebaseService } from 'src/firebase/FirebaseService';
+import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
+
 
 export interface CreateNotificationParams {
   userId: string;
@@ -46,10 +48,12 @@ export class NotificationService {
       return null;
     }
 
-   
     const fcmData: Record<string, string> = {
       notification_id: notification.id,
       type,
+      title,
+      content,
+      time: notification.created_at,
     };
     if (action) fcmData.action = action;
     if (requestId) fcmData.request_id = requestId;
@@ -57,6 +61,80 @@ export class NotificationService {
     await this.firebaseService.sendPushToUser(userId, title, content, fcmData);
 
     return notification;
+  }
+
+  async broadcastNotification(dto: BroadcastNotificationDto) {
+    const { title, content, image_url } = dto;
+
+    const { data: users, error } = await this.supabase
+      .from('users')
+      .select('id, fcm_token_android, fcm_token_ios');
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    if (!users || users.length === 0) {
+      return { success: true, message: Messages.broadcastSent, total_users: 0, sent: 0, failed: 0 };
+    }
+
+    const notificationRows = users.map((u) => ({
+      user_id: u.id,
+      title,
+      content,
+      image_url,
+      type: 'announcement',
+      action: 'broadcast',
+    }));
+
+    const { data: insertedNotifications, error: insertError } = await this.supabase
+      .from('notifications')
+      .insert(notificationRows)
+      .select('id, user_id, created_at');
+
+    if (insertError) {
+      throw new BadRequestException(insertError.message);
+    }
+
+    const notificationByUser = new Map(
+      (insertedNotifications ?? []).map((n) => [n.user_id, n]),
+    );
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const u of users) {
+      const notification = notificationByUser.get(u.id);
+      if (!notification) {
+        failed++;
+        continue;
+      }
+
+      const fcmData = {
+        notification_id: notification.id,
+        type: 'announcement',
+        action: 'broadcast',
+        title,
+        content,
+        time: notification.created_at,
+      };
+
+      if (u.fcm_token_android) {
+        await this.firebaseService.sendPush(u.fcm_token_android, title, content, fcmData);
+      }
+      if (u.fcm_token_ios) {
+        await this.firebaseService.sendPush(u.fcm_token_ios, title, content, fcmData);
+      }
+      sent++;
+    }
+
+    return {
+      success: true,
+      message: Messages.broadcastSent,
+      total_users: users.length,
+      sent,
+      failed,
+    };
   }
 
   async getNotifications(userId: string, query: QueryNotificationDto) {
@@ -109,5 +187,35 @@ export class NotificationService {
     }
 
     return data;
+  }
+
+  async markAsRead(notificationId: string, userId: string) {
+    const { data, error } = await this.supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+  
+    if (error || !data) {
+      throw new BadRequestException(Messages.notificationNotFound);
+    }
+  
+    return { success: true, message: Messages.notificationMarkedRead, data };
+  }
+  
+  async markAllAsRead(userId: string) {
+    const { error } = await this.supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+  
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  
+    return { success: true, message: Messages.allNotificationsMarkedRead };
   }
 }

@@ -89,4 +89,12 @@ export const Messages = {
     vi: 'Không tìm thấy thông báo',
     en: 'Notification not found',
   },
+  notificationMarkedRead: {
+    vi: 'Đã đánh dấu đã đọc',
+    en: 'Notification marked as read',
+  },
+  allNotificationsMarkedRead: {
+    vi: 'Đã đánh dấu tất cả thông báo là đã đọc',
+    en: 'All notifications marked as read',
+  },
 };

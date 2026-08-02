@@ -67,31 +67,5 @@ export class FirebaseService {
     }
   }
 
-  async sendBroadcast(tokens: string[], title: string, body: string, data?: Record<string, string>) {
-    if (tokens.length === 0) {
-      return { successCount: 0, failureCount: 0 };
-    }
-
-    const chunkSize = 500;
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (let i = 0; i < tokens.length; i += chunkSize) {
-      const chunk = tokens.slice(i, i + chunkSize);
-      try {
-        const response = await getMessaging(this.app).sendEachForMulticast({
-          tokens: chunk,
-          notification: { title, body },
-          data: data ?? {},
-        });
-        successCount += response.successCount;
-        failureCount += response.failureCount;
-      } catch (error) {
-        console.error('Error sending broadcast chunk:', error.message);
-        failureCount += chunk.length;
-      }
-    }
-
-    return { successCount, failureCount };
-  }
+ 
 }
