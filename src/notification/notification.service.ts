@@ -173,26 +173,37 @@ export class NotificationService {
     const { page = 1, limit = 10, unread_only } = query;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-
+  
     let request = this.supabase
       .from('notifications')
       .select('id, title, content, image_url, type, action, request_id, is_read, created_at', { count: 'exact' })
       .eq('user_id', userId);
-
+  
     if (unread_only) {
       request = request.eq('is_read', false);
     }
-
+  
     const { data, error, count } = await request
       .order('created_at', { ascending: false })
       .range(from, to);
-
+  
     if (error) {
       throw new BadRequestException(error.message);
     }
-
+  
+    const { count: unreadCount, error: unreadError } = await this.supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+  
+    if (unreadError) {
+      throw new BadRequestException(unreadError.message);
+    }
+  
     return {
       data,
+      unread_count: unreadCount ?? 0,
       pagination: {
         total: count ?? 0,
         page,
@@ -201,7 +212,6 @@ export class NotificationService {
       },
     };
   }
-
   async getNotificationDetail(notificationId: string, userId: string) {
     const { data, error } = await this.supabase
       .from('notifications')

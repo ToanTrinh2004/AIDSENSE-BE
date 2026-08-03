@@ -97,4 +97,20 @@ export const Messages = {
     vi: 'Đã đánh dấu tất cả thông báo là đã đọc',
     en: 'All notifications marked as read',
   },
+  notAMember: {
+    vi: 'Bạn không thuộc đội nào',
+    en: 'You are not part of any team',
+  },
+  memberNotFound: {
+    vi: 'Không tìm thấy thành viên trong đội',
+    en: 'Member not found in team',
+  },
+  cannotKickLeader: {
+    vi: 'Không thể loại bỏ trưởng đội',
+    en: 'Cannot remove the team leader',
+  },
+  memberKicked: {
+    vi: 'Đã loại bỏ thành viên khỏi đội',
+    en: 'Member removed from team',
+  },
 };

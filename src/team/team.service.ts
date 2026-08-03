@@ -198,21 +198,6 @@ export class TeamService {
     return data;
   }
 
-  async teamsInfo(user: any) {
-    const teamId = user.id;
-    const { data, error } = await this.supabase
-      .from('team_rescue')
-      .select('*')
-      .eq('leader_id', teamId)
-      .single();
-
-    if (error || !data) {
-      throw new HttpException('Không tìm thấy đội cứu trợ', HttpStatus.BAD_REQUEST);
-    }
-
-    return data;
-  }
-
   async getSosByTeam(user: any, status?: string) {
     const teamId = await this.validateApprovedTeam(user);
 
@@ -462,6 +447,14 @@ export class TeamService {
       if (userUpdateError) {
         throw new BadRequestException(userUpdateError.message);
       }
+
+      const { error: memberInsertError } = await this.supabase
+        .from('team_members')
+        .insert([{ team_id: joinRequest.team_id, user_id: joinRequest.user_id, status: 'ACTIVE' }]);
+
+      if (memberInsertError) {
+        throw new BadRequestException(memberInsertError.message);
+      }
     }
 
     const { data: leaderInfo } = await this.supabase
@@ -518,5 +511,129 @@ export class TeamService {
       statusCode: 200,
       data: data ?? [],
     };
+  }
+
+  // Any team member (leader or volunteer) views their own team's full info
+  async getMyTeamInfo(user: any) {
+    const userId = user.id;
+
+    const { data: membership, error: membershipError } = await this.supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+      .maybeSingle();
+
+    if (membershipError) {
+      throw new BadRequestException(membershipError.message);
+    }
+    if (!membership) {
+      throw new BadRequestException(Messages.notAMember);
+    }
+
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('*')
+      .eq('id', membership.team_id)
+      .single();
+
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+
+    return team;
+  }
+
+  // List all active members of a team (leader only)
+  async getTeamMembers(leaderUser: any) {
+    const leaderId = leaderUser.id;
+
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('id')
+      .eq('leader_id', leaderId)
+      .single();
+
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+
+    const { data, error } = await this.supabase
+      .from('team_members')
+      .select(`
+        id, status, joined_at,
+        users:user_id (
+          id, username, phone, avatar, roles
+        )
+      `)
+      .eq('team_id', team.id)
+      .eq('status', 'ACTIVE')
+      .order('joined_at', { ascending: true });
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return data;
+  }
+
+  // Leader kicks a member
+  async kickMember(memberId: string, leaderUser: any) {
+    const leaderId = leaderUser.id;
+
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('id')
+      .eq('leader_id', leaderId)
+      .single();
+
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+
+    if (memberId === leaderId) {
+      throw new BadRequestException(Messages.cannotKickLeader);
+    }
+
+    const { data: membership, error: membershipError } = await this.supabase
+      .from('team_members')
+      .select('id')
+      .eq('team_id', team.id)
+      .eq('user_id', memberId)
+      .eq('status', 'ACTIVE')
+      .maybeSingle();
+
+    if (membershipError || !membership) {
+      throw new BadRequestException(Messages.memberNotFound);
+    }
+
+    const { error: updateMembershipError } = await this.supabase
+      .from('team_members')
+      .update({ status: 'KICKED', removed_at: new Date().toISOString(), removed_by: leaderId })
+      .eq('id', membership.id);
+
+    if (updateMembershipError) {
+      throw new BadRequestException(updateMembershipError.message);
+    }
+
+    const { error: userUpdateError } = await this.supabase
+      .from('users')
+      .update({ roles: 'GUEST', team_id: null })
+      .eq('id', memberId);
+
+    if (userUpdateError) {
+      throw new BadRequestException(userUpdateError.message);
+    }
+
+    await this.notificationService.createAndSend({
+      userId: memberId,
+      title: 'Bạn đã bị loại khỏi đội',
+      content: 'Bạn không còn là thành viên của đội cứu hộ này.',
+      type: 'team_membership',
+      action: 'kicked',
+      requestId: team.id,
+    });
+
+    return { success: true, message: Messages.memberKicked };
   }
 }

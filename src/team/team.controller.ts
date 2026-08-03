@@ -67,7 +67,6 @@ export class TeamController {
     return this.teamService.createTeam(createTeamDto, file, req.user);
   }
 
-
   @ApiOperation({ summary: 'Xem chi tiết đội cứu hộ (chỉ đội đã duyệt)' })
   @ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
   @ApiResponse({ status: 200, description: 'Chi tiết đội cứu hộ' })
@@ -76,6 +75,7 @@ export class TeamController {
   async getTeamDetail(@Param('teamId') teamId: string) {
     return this.teamService.getTeamDetail(teamId);
   }
+
   @ApiOperation({ summary: 'Nhận yêu cầu hỗ trợ SOS' })
   @ApiParam({ name: 'sosId', description: 'ID yêu cầu SOS' })
   @ApiResponse({ status: 200, description: 'Nhận hỗ trợ thành công' })
@@ -106,13 +106,32 @@ export class TeamController {
     return this.teamService.supported(sosId, req.user);
   }
 
-  @ApiOperation({ summary: 'Xem thông tin đội của mình' })
+  @ApiOperation({ summary: 'Xem thông tin đội của mình (leader hoặc thành viên)' })
   @ApiResponse({ status: 200, description: 'Thông tin đội' })
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Get('my-team')
   async getMyTeam(@Req() req) {
-    return this.teamService.teamsInfo(req.user);
+    return this.teamService.getMyTeamInfo(req.user);
+  }
+
+  @ApiOperation({ summary: 'Xem danh sách thành viên trong đội (leader)' })
+  @ApiResponse({ status: 200, description: 'Danh sách thành viên' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Get('members')
+  async getTeamMembers(@Req() req) {
+    return this.teamService.getTeamMembers(req.user);
+  }
+
+  @ApiOperation({ summary: 'Loại bỏ thành viên khỏi đội (leader)' })
+  @ApiParam({ name: 'memberId', description: 'ID thành viên cần loại bỏ' })
+  @ApiResponse({ status: 200, description: 'Loại bỏ thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Post('members/:memberId/kick')
+  async kickMember(@Param('memberId') memberId: string, @Req() req) {
+    return this.teamService.kickMember(memberId, req.user);
   }
 
   @ApiOperation({ summary: 'Xem tất cả request SOS mà team đã/đang hỗ trợ' })
