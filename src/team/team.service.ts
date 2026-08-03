@@ -1,5 +1,5 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException, NotFoundException } from '@nestjs/common';
-import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
+import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -82,6 +82,17 @@ export class TeamService {
       if (userUpdateError) {
         throw new HttpException(
           `Không thể cập nhật vai trò người dùng: ${userUpdateError.message}`,
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      const { error: memberInsertError } = await this.supabase
+        .from('team_members')
+        .insert([{ team_id: teamData.id, user_id: userId, status: 'ACTIVE' }]);
+
+      if (memberInsertError) {
+        throw new HttpException(
+          `Không thể thêm leader vào danh sách thành viên: ${memberInsertError.message}`,
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -544,39 +555,54 @@ export class TeamService {
     return team;
   }
 
-  // List all active members of a team (leader only)
-  async getTeamMembers(leaderUser: any) {
-    const leaderId = leaderUser.id;
-
-    const { data: team, error: teamError } = await this.supabase
-      .from('team_rescue')
-      .select('id')
-      .eq('leader_id', leaderId)
-      .single();
-
-    if (teamError || !team) {
-      throw new BadRequestException(Messages.teamNotFound);
+  async getTeamMembers(user: any, query: QueryTeamMembersDto) {
+    const userId = user.id;
+    const { page = 1, limit = 10 } = query;
+  
+    const { data: membership, error: membershipError } = await this.supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('user_id', userId)
+      .eq('status', 'ACTIVE')
+      .maybeSingle();
+  
+    if (membershipError) {
+      throw new BadRequestException(membershipError.message);
     }
-
-    const { data, error } = await this.supabase
+    if (!membership) {
+      throw new BadRequestException(Messages.notAMember);
+    }
+  
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+  
+    const { data, error, count } = await this.supabase
       .from('team_members')
       .select(`
         id, status, joined_at,
         users:user_id (
           id, username, phone, avatar, roles
         )
-      `)
-      .eq('team_id', team.id)
+      `, { count: 'exact' })
+      .eq('team_id', membership.team_id)
       .eq('status', 'ACTIVE')
-      .order('joined_at', { ascending: true });
-
+      .order('joined_at', { ascending: true })
+      .range(from, to);
+  
     if (error) {
       throw new BadRequestException(error.message);
     }
-
-    return data;
+  
+    return {
+      data,
+      pagination: {
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0,
+      },
+    };
   }
-
   // Leader kicks a member
   async kickMember(memberId: string, leaderUser: any) {
     const leaderId = leaderUser.id;

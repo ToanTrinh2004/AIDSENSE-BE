@@ -24,7 +24,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
+import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -115,13 +115,13 @@ export class TeamController {
     return this.teamService.getMyTeamInfo(req.user);
   }
 
-  @ApiOperation({ summary: 'Xem danh sách thành viên trong đội (leader)' })
+  @ApiOperation({ summary: 'Xem danh sách thành viên trong đội (leader hoặc thành viên)' })
   @ApiResponse({ status: 200, description: 'Danh sách thành viên' })
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Get('members')
-  async getTeamMembers(@Req() req) {
-    return this.teamService.getTeamMembers(req.user);
+  async getTeamMembers(@Req() req, @Query() query: QueryTeamMembersDto) {
+    return this.teamService.getTeamMembers(req.user, query);
   }
 
   @ApiOperation({ summary: 'Loại bỏ thành viên khỏi đội (leader)' })
