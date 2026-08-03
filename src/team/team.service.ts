@@ -177,7 +177,7 @@ export class TeamService {
       throw new HttpException('Team không tồn tại hoặc chưa được phê duyệt', HttpStatus.BAD_REQUEST);
     }
 
-    return data.id; 
+    return data.id;
   }
 
   private async validateSosStatus(sosId: string, expectedStatus: string) {
@@ -266,7 +266,7 @@ export class TeamService {
     let request = this.supabase
       .from('team_rescue')
       .select('*', { count: 'exact' })
-      .eq('team_status', 'APPROVED'); 
+      .eq('team_status', 'APPROVED');
 
     if (province) {
       request = request.eq('province', province);
@@ -305,30 +305,30 @@ export class TeamService {
 
   async requestToJoinTeam(userId: string, dto: RequestJoinTeamDto) {
     const { team_id, request_message } = dto;
-  
+
     const { data: currentUser, error: userError } = await this.supabase
       .from('users')
       .select('team_id, username, phone')
       .eq('id', userId)
       .single();
-  
+
     if (userError) {
       throw new BadRequestException(Messages.cannotCheckUser);
     }
     if (currentUser?.team_id) {
       throw new BadRequestException(Messages.alreadyInTeam);
     }
-  
+
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
       .select('id, name, leader_id')
       .eq('id', team_id)
       .single();
-  
+
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-  
+
     const { data: existingRequest } = await this.supabase
       .from('team_join_requests')
       .select('id')
@@ -336,21 +336,27 @@ export class TeamService {
       .eq('team_id', team_id)
       .eq('status', 'PENDING')
       .maybeSingle();
-  
+
     if (existingRequest) {
       throw new BadRequestException(Messages.joinRequestAlreadyPending);
     }
-  
+
     const { data, error } = await this.supabase
       .from('team_join_requests')
       .insert([{ user_id: userId, team_id, status: 'PENDING', request_message }])
       .select()
       .single();
-  
+
     if (error) {
       throw new BadRequestException(error.message);
     }
-  
+
+    const joinRequestPayload = {
+      username: currentUser.username,
+      phone: currentUser.phone,
+      time: data.created_at,
+      reason: request_message,
+    };
 
     await this.notificationService.createAndSend({
       userId: team.leader_id,
@@ -359,19 +365,10 @@ export class TeamService {
       type: 'join_request',
       action: 'created',
       requestId: data.id,
-      data: {
-        team_id: team.id,
-        team_name: team.name,
-        user: {
-          id: userId,
-          username: currentUser.username,
-          phone: currentUser.phone,
-          reason: request_message,
-          time: data.created_at,
-        },
-      },
+      data: joinRequestPayload,
+      extraPayload: joinRequestPayload,
     });
-  
+
     return { success: true, message: Messages.joinRequestSent, data };
   }
 
@@ -423,25 +420,25 @@ export class TeamService {
   async respondToJoinRequest(requestId: string, leaderUser: any, dto: RespondJoinRequestDto) {
     const leaderId = leaderUser.id;
     const { status, response_message } = dto;
-  
+
     const { data: joinRequest, error: requestError } = await this.supabase
       .from('team_join_requests')
-      .select('*, team_rescue!inner(id, leader_id, name, phone)')
+      .select('*, team_rescue!inner(id, leader_id, name, province, phone)')
       .eq('id', requestId)
       .single();
-  
+
     if (requestError || !joinRequest) {
       throw new BadRequestException(Messages.joinRequestNotFound);
     }
-  
+
     if (joinRequest.team_rescue.leader_id !== leaderId) {
       throw new BadRequestException(Messages.notTeamLeader);
     }
-  
+
     if (joinRequest.status !== 'PENDING') {
       throw new BadRequestException(Messages.joinRequestAlreadyResponded);
     }
-  
+
     const { error: updateError } = await this.supabase
       .from('team_join_requests')
       .update({
@@ -451,33 +448,43 @@ export class TeamService {
         responded_by: leaderId,
       })
       .eq('id', requestId);
-  
+
     if (updateError) {
       throw new BadRequestException(updateError.message);
     }
-  
+
     if (status === 'ACCEPTED') {
       const { error: userUpdateError } = await this.supabase
         .from('users')
         .update({ roles: 'VOLUNTEER', team_id: joinRequest.team_id })
         .eq('id', joinRequest.user_id);
-  
+
       if (userUpdateError) {
         throw new BadRequestException(userUpdateError.message);
       }
     }
-  
+
     const { data: leaderInfo } = await this.supabase
       .from('users')
       .select('username')
       .eq('id', leaderId)
       .single();
-  
+
     const title = status === 'ACCEPTED' ? 'Yêu cầu được chấp nhận' : 'Yêu cầu bị từ chối';
     const body = response_message || (status === 'ACCEPTED'
       ? `Bạn đã được chấp nhận vào đội ${joinRequest.team_rescue.name}`
       : `Yêu cầu tham gia đội ${joinRequest.team_rescue.name} đã bị từ chối`);
-  
+
+    const responsePayload = {
+      team_id: joinRequest.team_id,
+      team_name: joinRequest.team_rescue.name,
+      province: joinRequest.team_rescue.province,
+      leader_name: leaderInfo?.username,
+      leader_phone: joinRequest.team_rescue.phone,
+      sent_at: joinRequest.created_at,
+      reason: response_message,
+    };
+
     await this.notificationService.createAndSend({
       userId: joinRequest.user_id,
       title,
@@ -485,15 +492,10 @@ export class TeamService {
       type: 'join_request',
       action: status.toLowerCase(),
       requestId,
-      data: {
-        team_id: joinRequest.team_id,
-        team_name: joinRequest.team_rescue.name,
-        leader_name: leaderInfo?.username,
-        leader_phone: joinRequest.team_rescue.phone,
-        reason: response_message,
-      },
+      data: responsePayload,
+      extraPayload: responsePayload,
     });
-  
+
     return {
       success: true,
       message: status === 'ACCEPTED' ? Messages.joinRequestAccepted : Messages.joinRequestRejected,
@@ -505,23 +507,16 @@ export class TeamService {
       .from('team_join_requests')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'PENDING')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
     if (error) {
       throw new BadRequestException(error.message);
     }
 
-    if (!data) {
-      throw new NotFoundException('Không có yêu cầu tham gia đội hiện tại');
-    }
-
     return {
       success: true,
       statusCode: 200,
-      data,
+      data: data ?? [],
     };
   }
 }

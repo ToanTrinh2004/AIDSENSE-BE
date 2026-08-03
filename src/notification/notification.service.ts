@@ -15,7 +15,8 @@ export interface CreateNotificationParams {
   type: string;
   action?: string;
   requestId?: string;
-  data?: Record<string, any>;
+  data?: Record<string, any>;        
+  extraPayload?: Record<string, any>; 
 }
 
 @Injectable()
@@ -26,7 +27,7 @@ export class NotificationService {
   ) {}
 
   async createAndSend(params: CreateNotificationParams) {
-    const { userId, title, content, imageUrl, type, action, requestId, data } = params;
+    const { userId, title, content, imageUrl, type, action, requestId, data, extraPayload } = params;
 
     const { data: notification, error } = await this.supabase
       .from('notifications')
@@ -57,6 +58,7 @@ export class NotificationService {
     };
     if (action) fcmData.action = action;
     if (requestId) fcmData.request_id = requestId;
+    if (extraPayload) fcmData.payload = JSON.stringify(extraPayload);
 
     await this.firebaseService.sendPushToUser(userId, title, content, fcmData);
 
@@ -137,6 +139,36 @@ export class NotificationService {
     };
   }
 
+  async markAsRead(notificationId: string, userId: string) {
+    const { data, error } = await this.supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new BadRequestException(Messages.notificationNotFound);
+    }
+
+    return { success: true, message: Messages.notificationMarkedRead, data };
+  }
+
+  async markAllAsRead(userId: string) {
+    const { error } = await this.supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    return { success: true, message: Messages.allNotificationsMarkedRead };
+  }
+
   async getNotifications(userId: string, query: QueryNotificationDto) {
     const { page = 1, limit = 10, unread_only } = query;
     const from = (page - 1) * limit;
@@ -187,35 +219,5 @@ export class NotificationService {
     }
 
     return data;
-  }
-
-  async markAsRead(notificationId: string, userId: string) {
-    const { data, error } = await this.supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId)
-      .eq('user_id', userId)
-      .select()
-      .single();
-  
-    if (error || !data) {
-      throw new BadRequestException(Messages.notificationNotFound);
-    }
-  
-    return { success: true, message: Messages.notificationMarkedRead, data };
-  }
-  
-  async markAllAsRead(userId: string) {
-    const { error } = await this.supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
-  
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
-  
-    return { success: true, message: Messages.allNotificationsMarkedRead };
   }
 }
