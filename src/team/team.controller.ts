@@ -25,7 +25,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
+import { CreateTeamDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -140,8 +140,8 @@ export class TeamController {
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Post('members/:memberId/kick')
-  async kickMember(@Param('memberId') memberId: string, @Req() req) {
-    return this.teamService.kickMember(memberId, req.user);
+  async kickMember(@Param('memberId') memberId: string, @Body() dto: KickMemberDto, @Req() req) {
+    return this.teamService.kickMember(memberId, req.user, dto);
   }
 
   @ApiOperation({ summary: 'Xem tất cả request SOS mà team đã/đang hỗ trợ' })

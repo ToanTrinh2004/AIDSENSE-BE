@@ -1,5 +1,5 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException, NotFoundException } from '@nestjs/common';
-import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
+import { CreateTeamDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -398,20 +398,20 @@ export class TeamService {
   async getPendingJoinRequests(leaderUser: any, query: QueryJoinRequestsDto) {
     const leaderId = leaderUser.id;
     const { page = 1, limit = 10 } = query;
-
+  
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
       .select('id')
       .eq('leader_id', leaderId)
       .single();
-
+  
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-
+  
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-
+  
     const { data, error, count } = await this.supabase
       .from('team_join_requests')
       .select(`
@@ -424,13 +424,14 @@ export class TeamService {
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false })
       .range(from, to);
-
+  
     if (error) {
       throw new BadRequestException(error.message);
     }
-
+  
     return {
       data,
+      count_request: count ?? 0,
       pagination: {
         total: count ?? 0,
         page,
@@ -551,7 +552,7 @@ export class TeamService {
     };
   }
 
-  // Any team member (leader or volunteer) views their own team's full info
+
   async getMyTeamInfo(user: any) {
     const userId = user.id;
 
@@ -631,24 +632,25 @@ export class TeamService {
       },
     };
   }
-  // Leader kicks a member
-  async kickMember(memberId: string, leaderUser: any) {
+ 
+  async kickMember(memberId: string, leaderUser: any, dto: KickMemberDto) {
     const leaderId = leaderUser.id;
-
+    const { reason_kicked } = dto;
+  
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')
-      .select('id')
+      .select('id, name')
       .eq('leader_id', leaderId)
       .single();
-
+  
     if (teamError || !team) {
       throw new BadRequestException(Messages.teamNotFound);
     }
-
+  
     if (memberId === leaderId) {
       throw new BadRequestException(Messages.cannotKickLeader);
     }
-
+  
     const { data: membership, error: membershipError } = await this.supabase
       .from('team_members')
       .select('id')
@@ -656,38 +658,45 @@ export class TeamService {
       .eq('user_id', memberId)
       .eq('status', 'ACTIVE')
       .maybeSingle();
-
+  
     if (membershipError || !membership) {
       throw new BadRequestException(Messages.memberNotFound);
     }
-
+  
     const { error: updateMembershipError } = await this.supabase
       .from('team_members')
-      .update({ status: 'KICKED', removed_at: new Date().toISOString(), removed_by: leaderId })
+      .update({
+        status: 'KICKED',
+        removed_at: new Date().toISOString(),
+        removed_by: leaderId,
+        reason_kicked,
+      })
       .eq('id', membership.id);
-
+  
     if (updateMembershipError) {
       throw new BadRequestException(updateMembershipError.message);
     }
-
+  
     const { error: userUpdateError } = await this.supabase
       .from('users')
       .update({ roles: 'GUEST', team_id: null })
       .eq('id', memberId);
-
+  
     if (userUpdateError) {
       throw new BadRequestException(userUpdateError.message);
     }
-
+  
     await this.notificationService.createAndSend({
       userId: memberId,
       title: 'Bạn đã bị loại khỏi đội',
-      content: 'Bạn không còn là thành viên của đội cứu hộ này.',
+      content: reason_kicked,
       type: 'team_membership',
       action: 'kicked',
       requestId: team.id,
+      data: { team_id: team.id, team_name: team.name, reason_kicked },
+      extraPayload: { team_id: team.id, team_name: team.name, reason_kicked },
     });
-
+  
     return { success: true, message: Messages.memberKicked };
   }
 }

@@ -145,4 +145,11 @@ export class QueryTeamMembersDto {
   @Min(1)
   limit?: number = 10;
 }
+
+export class KickMemberDto {
+  @ApiProperty({ example: 'Vi phạm nội quy đội', description: 'Lý do loại bỏ thành viên' })
+  @IsNotEmpty({ message: 'Lý do không được để trống' })
+  @IsString()
+  reason_kicked: string;
+}
 export class UpdateTeamInfoDto extends PartialType(CreateTeamDto) {}
