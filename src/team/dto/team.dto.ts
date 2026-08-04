@@ -145,3 +145,4 @@ export class QueryTeamMembersDto {
   @Min(1)
   limit?: number = 10;
 }
+export class UpdateTeamInfoDto extends PartialType(CreateTeamDto) {}

@@ -1,5 +1,5 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException, NotFoundException } from '@nestjs/common';
-import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
+import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -255,6 +255,33 @@ export class TeamService {
       members: members ?? [],
       total_members: members?.length ?? 0,
     };
+  }
+
+  async updateMyTeam(user: any, dto: UpdateTeamInfoDto) {
+    const leaderId = user.id;
+  
+    const { data: team, error: teamError } = await this.supabase
+      .from('team_rescue')
+      .select('id')
+      .eq('leader_id', leaderId)
+      .single();
+  
+    if (teamError || !team) {
+      throw new BadRequestException(Messages.teamNotFound);
+    }
+  
+    const { data, error } = await this.supabase
+      .from('team_rescue')
+      .update({ ...dto })
+      .eq('id', team.id)
+      .select()
+      .single();
+  
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+  
+    return { success: true, message: Messages.teamUpdated, data };
   }
   async findAllTeams(query: QueryTeamDto) {
     const { province, name, size_member, page = 1, limit = 10 } = query;
@@ -595,6 +622,7 @@ export class TeamService {
   
     return {
       data,
+      count_member: count ?? 0,
       pagination: {
         total: count ?? 0,
         page,

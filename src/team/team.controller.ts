@@ -10,6 +10,7 @@ import {
   UploadedFile,
   Req,
   Query,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -24,7 +25,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto } from './dto/team.dto';
+import { CreateTeamDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -113,6 +114,15 @@ export class TeamController {
   @Get('my-team')
   async getMyTeam(@Req() req) {
     return this.teamService.getMyTeamInfo(req.user);
+  }
+
+  @ApiOperation({ summary: 'Chỉnh sửa thông tin đội của mình (leader)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Patch('my-team')
+  async updateMyTeam(@Req() req, @Body() dto: UpdateTeamInfoDto) {
+    return this.teamService.updateMyTeam(req.user, dto);
   }
 
   @ApiOperation({ summary: 'Xem danh sách thành viên trong đội (leader hoặc thành viên)' })

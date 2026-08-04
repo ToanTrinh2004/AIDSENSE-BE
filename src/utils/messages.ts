@@ -113,4 +113,8 @@ export const Messages = {
     vi: 'Đã loại bỏ thành viên khỏi đội',
     en: 'Member removed from team',
   },
+  teamUpdated: {
+    vi: 'Cập nhật thông tin đội thành công',
+    en: 'Team information updated successfully',
+  },
 };
