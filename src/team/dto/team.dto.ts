@@ -152,4 +152,10 @@ export class KickMemberDto {
   @IsString()
   reason_kicked: string;
 }
+export class GetUserInfoQueryDto {
+  @ApiPropertyOptional({ example: 'uuid-of-user', description: 'ID người dùng muốn xem (bỏ trống để xem thông tin của chính mình)' })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+}
 export class UpdateTeamInfoDto extends PartialType(CreateTeamDto) {}

@@ -25,7 +25,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
+import { CreateTeamDto, GetUserInfoQueryDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -201,5 +201,14 @@ export class TeamController {
   @Get('join-request/current')
   async getCurrentJoinRequest(@Req() req) {
     return this.teamService.getCurrentJoinRequest(req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Xem thông tin người dùng ' })
+  @ApiResponse({ status: 200, description: 'Thông tin người dùng' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Get('user-info')
+  async getUserInfo(@Req() req, @Query() query: GetUserInfoQueryDto) {
+    return this.teamService.getUserInfo(req.user, query.userId);
   }
 }

@@ -102,3 +102,17 @@ export class LogoutDto {
   @IsIn(['android', 'ios'])
   platform: 'android' | 'ios';
 }
+export class ChangePasswordDto {
+  @ApiProperty({ example: 'oldpassword123', description: 'Mật khẩu hiện tại' })
+  @IsNotEmpty({ message: 'Mật khẩu cũ không được để trống' })
+  old_password: string;
+
+  @ApiProperty({ example: 'newpassword123', minLength: 6, description: 'Mật khẩu mới' })
+  @IsNotEmpty({ message: 'Mật khẩu mới không được để trống' })
+  @MinLength(6, { message: 'Mật khẩu phải có ít nhất 6 ký tự' })
+  new_password: string;
+
+  @ApiProperty({ example: 'newpassword123', description: 'Nhập lại mật khẩu mới' })
+  @IsNotEmpty({ message: 'Xác nhận mật khẩu không được để trống' })
+  confirm_new_password: string;
+}

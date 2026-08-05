@@ -699,4 +699,19 @@ export class TeamService {
   
     return { success: true, message: Messages.memberKicked };
   }
+  async getUserInfo(currentUser: any, targetUserId?: string) {
+    const userId = targetUserId || currentUser.id;
+  
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('id, username, avatar, dob, address, phone, roles, team_id, province')
+      .eq('id', userId)
+      .single();
+  
+    if (error || !data) {
+      throw new BadRequestException(Messages.userNotFound);
+    }
+  
+    return data;
+  }
 }

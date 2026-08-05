@@ -10,6 +10,7 @@ import {
   TeamPhoneDto,
   TeamVerifyOtpDto,
   LogoutDto,
+  ChangePasswordDto,
 } from './dto/auth-dto';
 import { AuthGuard } from './auth.guard';
 
@@ -89,11 +90,20 @@ export class AuthController {
     return this.authService.verifyOtpForTeamLeader(dto.phone, dto.otp);
   }
   @ApiOperation({ summary: 'Đăng xuất' })
-@ApiResponse({ status: 200, description: 'Đăng xuất thành công' })
-@HttpCode(200)
-@UseGuards(AuthGuard)
-@Post('logout')
-async logout(@Req() req, @Body() dto: LogoutDto) {
-  return this.authService.logout(req.user.id, dto.platform);
-}
+  @ApiResponse({ status: 200, description: 'Đăng xuất thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Post('logout')
+  async logout(@Req() req, @Body() dto: LogoutDto) {
+    return this.authService.logout(req.user.id, dto.platform);
+  }
+
+  @ApiOperation({ summary: 'Đổi mật khẩu' })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Post('change-password')
+  async changePassword(@Req() req, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto);
+  }
 }

@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { jwtConstants } from './constant';
 import { SmsService, OtpVerifyResult } from './sms.service';
 import Redis from 'ioredis';
-import { SignupDto, SignInDto, OtpType } from './dto/auth-dto';
+import { SignupDto, SignInDto, OtpType, ChangePasswordDto } from './dto/auth-dto';
 import { Messages } from '../utils/messages';
 
 @Injectable()
@@ -306,5 +306,43 @@ export class AuthService {
  
   }
 
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const { old_password, new_password, confirm_new_password } = dto;
   
+    if (new_password !== confirm_new_password) {
+      throw new BadRequestException(Messages.passwordMismatch);
+    }
+  
+    const { data: authRow, error: authError } = await this.supabase
+      .from('auth')
+      .select('*')
+      .eq('userId', userId)
+      .single();
+  
+    if (authError || !authRow) {
+      throw new BadRequestException(Messages.userNotFound);
+    }
+  
+    const isOldPasswordValid = await bcrypt.compare(old_password, authRow.password);
+    if (!isOldPasswordValid) {
+      throw new BadRequestException(Messages.oldPasswordIncorrect);
+    }
+  
+    const isSameAsOld = await bcrypt.compare(new_password, authRow.password);
+    if (isSameAsOld) {
+      throw new BadRequestException(Messages.newPasswordSameAsOld);
+    }
+  
+    const hashedNewPassword = await bcrypt.hash(new_password, 10);
+    const { error: updateError } = await this.supabase
+      .from('auth')
+      .update({ password: hashedNewPassword })
+      .eq('userId', userId);
+  
+    if (updateError) {
+      throw new BadRequestException(Messages.cannotUpdatePassword);
+    }
+  
+    return { success: true, message: Messages.passwordUpdateSuccess };
+  }
 }

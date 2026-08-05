@@ -117,4 +117,13 @@ export const Messages = {
     vi: 'Cập nhật thông tin đội thành công',
     en: 'Team information updated successfully',
   },
+  oldPasswordIncorrect: {
+    vi: 'Mật khẩu cũ không đúng',
+    en: 'Current password is incorrect',
+  },
+  newPasswordSameAsOld: {
+    vi: 'Mật khẩu mới không được trùng mật khẩu cũ',
+    en: 'New password must be different from the current password',
+  },
+ 
 };
