@@ -173,11 +173,11 @@ export class QuerySosDto {
   @IsNumber()
   center_lon?: number;
 
-  @ApiPropertyOptional({ example: 1000, default: 1000, description: 'Bán kính lọc (mét)' })
+  @ApiPropertyOptional({ example: 100000, default: 100000, description: 'Bán kính lọc (mét)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  radius_meters?: number = 1000;
+  radius_meters?: number = 100000;
 }
 
 
