@@ -38,12 +38,12 @@ export class EventDto {
   @ApiPropertyOptional({
     example: ['HELP', 'ESSENTIAL'],
     description: 'Danh sách mã loại sự kiện',
-    enum: ['HELP', 'ESSENTIAL', 'TOWING', 'OTHER'],
+    enum: ['HELP', 'ESSENTIAL', 'FOOD', 'OTHER'],
     isArray: true,
   })
   @IsOptional()
   @IsArray()
-  @IsIn(['HELP', 'ESSENTIAL', 'TOWING', 'OTHER'], { each: true })
+  @IsIn(['HELP', 'ESSENTIAL', 'FOOD', 'OTHER'], { each: true })
   codes?: string[];
 
   @ApiPropertyOptional({ example: 'group-1', description: 'Nhóm sự kiện' })

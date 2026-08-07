@@ -1,12 +1,23 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, IsNumber } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, IsNumber, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-
+export enum SosType {
+  HELP = 'HELP',
+  ESSENTIAL = 'ESSENTIAL',
+  FOOD = 'FOOD',
+  OTHER = 'OTHER',
+}
 export class CreateSosDto {
-  @ApiProperty({ example: 'HELP', description: 'Loại yêu cầu SOS' })
+  @ApiProperty({
+    enum: SosType,
+    example: SosType.HELP,
+    description: 'Loại yêu cầu SOS',
+  })
   @IsNotEmpty()
-  @IsString()
-  type: string;
+  @IsEnum(SosType, {
+    message: 'type must be one of: HELP, ESSENTIAL, FOOD, OTHER',
+  })
+  type: SosType;
 
   @ApiPropertyOptional({ example: 'Xe hỏng giữa đường cao tốc', description: 'Mô tả tình huống' })
   @IsOptional()
