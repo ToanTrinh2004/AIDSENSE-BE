@@ -212,34 +212,38 @@ export class SosService {
     );
     if (!res.ok) throw new Error('Reverse geocode failed');
     const data = await res.json();
+    console.log(data)
     return data.display_name ?? 'Không xác định';
   }
-  private normalizeProvince(name: string): string | null {
-    const input = name.trim().toLowerCase();
+  private normalizeProvince(text: string): string | null {
+    const input = text
+      .normalize('NFC')
+      .toLowerCase()
+      .trim();
   
-    const aliases: Record<string, string> = {
+    const provinces: Record<string, string> = {
       // Municipalities
-      'hà nội': 'Thành phố Hà Nội',
-      'thành phố hà nội': 'Thành phố Hà Nội',
-  
-      'hải phòng': 'Thành phố Hải Phòng',
-      'thành phố hải phòng': 'Thành phố Hải Phòng',
-  
-      'huế': 'Thành phố Huế',
-      'thành phố huế': 'Thành phố Huế',
-      'thừa thiên huế': 'Thành phố Huế',
-  
-      'đà nẵng': 'Thành phố Đà Nẵng',
-      'thành phố đà nẵng': 'Thành phố Đà Nẵng',
-  
-      'hồ chí minh': 'Thành phố Hồ Chí Minh',
       'thành phố hồ chí minh': 'Thành phố Hồ Chí Minh',
+      'hồ chí minh': 'Thành phố Hồ Chí Minh',
+      'ho chi minh city': 'Thành phố Hồ Chí Minh',
       'tp hồ chí minh': 'Thành phố Hồ Chí Minh',
       'tp. hồ chí minh': 'Thành phố Hồ Chí Minh',
-      'ho chi minh city': 'Thành phố Hồ Chí Minh',
   
-      'cần thơ': 'Thành phố Cần Thơ',
+      'thành phố hà nội': 'Thành phố Hà Nội',
+      'hà nội': 'Thành phố Hà Nội',
+  
+      'thành phố hải phòng': 'Thành phố Hải Phòng',
+      'hải phòng': 'Thành phố Hải Phòng',
+  
+      'thành phố đà nẵng': 'Thành phố Đà Nẵng',
+      'đà nẵng': 'Thành phố Đà Nẵng',
+  
+      'thành phố huế': 'Thành phố Huế',
+      'huế': 'Thành phố Huế',
+      'thừa thiên huế': 'Thành phố Huế',
+  
       'thành phố cần thơ': 'Thành phố Cần Thơ',
+      'cần thơ': 'Thành phố Cần Thơ',
   
       // Provinces
       'cao bằng': 'Cao Bằng',
@@ -272,9 +276,14 @@ export class SosService {
       'cà mau': 'Cà Mau',
     };
   
-    return aliases[input] ?? null;
-  }
+    for (const [key, value] of Object.entries(provinces)) {
+      if (input.includes(key)) {
+        return value;
+      }
+    }
   
+    return null;
+  }
   async getProvinceFromCoords(
     lat: number,
     lon: number,
@@ -289,30 +298,42 @@ export class SosService {
       }
   
       const data = await res.json();
-      const address = data.address;
+      const address = data.address ?? {};
   
-      // Ensure the coordinates are in Vietnam
-      if (address?.country_code?.toLowerCase() !== 'vn') {
+      // Ensure Vietnam
+      if (address.country_code?.toLowerCase() !== 'vn') {
         return null;
       }
   
-      const candidates = [
+      // Try structured address fields first
+      const fields = [
         address.state,
         address.province,
         address.city,
         address.county,
         address.state_district,
+        address.region,
+        address.municipality,
       ].filter(Boolean);
   
-      for (const candidate of candidates) {
-        const province = this.normalizeProvince(candidate);
+      for (const field of fields) {
+        const province = this.normalizeProvince(field);
+        if (province) {
+          return province;
+        }
+      }
+  
+      // Fallback to display_name
+      if (data.display_name) {
+        const province = this.normalizeProvince(data.display_name);
         if (province) {
           return province;
         }
       }
   
       console.warn(
-        `[getProvinceFromCoords] Cannot map province: ${JSON.stringify(address)}`,
+        '[getProvinceFromCoords] Unable to determine province',
+        JSON.stringify(data, null, 2),
       );
   
       return null;
