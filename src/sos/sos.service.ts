@@ -82,6 +82,11 @@ export class SosService {
         ? await this.cloudinaryService.uploadBufferFile(file)
         : null;
 
+        let province: string | null = null;
+        if (createSosDto.lat && createSosDto.lon) {
+          province = await this.getProvinceFromCoords(createSosDto.lat, createSosDto.lon);
+        }
+
       const { data: sos, error: sosError } = await this.supabase
         .from('sos_request')
         .insert({
@@ -95,6 +100,7 @@ export class SosService {
           address_text: createSosDto.address_text,
           location: `SRID=4326;POINT(${createSosDto.lon} ${createSosDto.lat})`,
           status: 'REQUESTED',
+          province: province,
         })
         .select()
         .single();
@@ -207,5 +213,49 @@ export class SosService {
     if (!res.ok) throw new Error('Reverse geocode failed');
     const data = await res.json();
     return data.display_name ?? 'Không xác định';
+  }
+  async getProvinceFromCoords(
+    lat: number,
+    lon: number,
+  ): Promise<string | null> {
+    try {
+      const res = await fetch(
+        `https://geocode.maps.co/reverse?lat=${lat}&lon=${lon}&api_key=${process.env.GEOCODING_API_KEY}`,
+      );
+  
+      if (!res.ok) return null;
+  
+      const data = await res.json();
+  
+      const address = data.address;
+  
+      // Ensure location is in Vietnam
+      if (address?.country_code?.toLowerCase() !== 'vn') {
+        return null;
+      }
+  
+      let province =
+        address.state ??
+        address.province ??
+        address.city ??
+        address.county ??
+        null;
+  
+      if (!province) return null;
+  
+      province = this.normalizeVietnamProvince(province);
+  
+      return province;
+    } catch (err) {
+      console.error('[getProvinceFromCoords]', err);
+      return null;
+    }
+  }
+  
+  private normalizeVietnamProvince(name: string): string {
+    return name
+      .replace(/^Thành phố\s+/i, '')
+      .replace(/^Tỉnh\s+/i, '')
+      .trim();
   }
 }

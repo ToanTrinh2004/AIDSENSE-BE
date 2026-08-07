@@ -14,6 +14,8 @@ export class EventsService {
   private readonly MAX_MARKERS = 500;       // ngưỡng marker thật tối đa 1 lần trả về
   private readonly CLUSTER_ZOOM_THRESHOLD = 12;
 
+
+  
   private getClusterDistanceForZoom(zoom: number): number {
     if (zoom <= 6) return 200000;   // 200km
     if (zoom <= 8) return 50000;    // 50km
@@ -114,64 +116,75 @@ export class EventsService {
   
   async getSosList(query: QuerySosDto) {
     const {
-      page = 1,
-      limit = 20,
-      status,
-      type,
-      userid,
-      teamId,
-      time_window,
-      is_ai_edited,
-      search,
+      page = 1, limit = 20, status, type, userid, teamId,
+      time_window, is_ai_edited, search, province,
+      center_lat, center_lon, radius_meters = 1000,
     } = query;
+  
+    const minCreatedAt = this.getMinCreatedAt(time_window);
+  
+    // Có tọa độ tâm điểm -> lọc theo bán kính bằng RPC
+    if (center_lat !== undefined && center_lon !== undefined) {
+      const { data, error } = await this.supabase.rpc('get_sos_within_radius', {
+        center_lat,
+        center_lon,
+        radius_meters,
+        status_filter: status ?? null,
+      });
+  
+      if (error) throw new BadRequestException(error.message);
+  
+      // áp dụng thêm các filter khác (type, province, search...) trên kết quả đã lọc theo bán kính
+      let filtered = data ?? [];
+      if (type) filtered = filtered.filter((s: any) => s.type === type);
+      if (userid) filtered = filtered.filter((s: any) => s.userid === userid);
+      if (teamId) filtered = filtered.filter((s: any) => s.teamId === teamId);
+      if (province) filtered = filtered.filter((s: any) => s.province === province);
+      if (is_ai_edited !== undefined) filtered = filtered.filter((s: any) => s.is_ai_edited === is_ai_edited);
+      if (search) {
+        const s = search.toLowerCase();
+        filtered = filtered.filter((r: any) =>
+          r.description?.toLowerCase().includes(s) || r.address_text?.toLowerCase().includes(s)
+        );
+      }
+      if (minCreatedAt) {
+        filtered = filtered.filter((r: any) => new Date(r.created_at) >= new Date(minCreatedAt));
+      }
+  
+      const total = filtered.length;
+      const from = (page - 1) * limit;
+      const paged = filtered.slice(from, from + limit);
+  
+      return {
+        data: paged,
+        pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    }
+  
+    // Không có tọa độ tâm điểm -> query thường, filter trực tiếp trên DB
+    let request = this.supabase.from('sos_request').select('*', { count: 'exact' });
+  
+    if (status) request = request.eq('status', status);
+    if (type) request = request.eq('type', type);
+    if (userid) request = request.eq('userid', userid);
+    if (teamId) request = request.eq('teamId', teamId);
+    if (province) request = request.eq('province', province);
+    if (is_ai_edited !== undefined) request = request.eq('is_ai_edited', is_ai_edited);
+    if (search) request = request.or(`description.ilike.%${search}%,address_text.ilike.%${search}%`);
+    if (minCreatedAt) request = request.gte('created_at', minCreatedAt);
   
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-  
-    let request = this.supabase
-      .from('sos_request')
-      .select('*', { count: 'exact' });
-  
-    if (status) {
-      request = request.eq('status', status);
-    }
-    if (type) {
-      request = request.eq('type', type);
-    }
-    if (userid) {
-      request = request.eq('userid', userid);
-    }
-    if (teamId) {
-      request = request.eq('teamId', teamId);
-    }
-    if (is_ai_edited !== undefined) {
-      request = request.eq('is_ai_edited', is_ai_edited);
-    }
-    if (search) {
-      request = request.or(`description.ilike.%${search}%,address_text.ilike.%${search}%`);
-    }
-  
-    const minCreatedAt = this.getMinCreatedAt(time_window);
-    if (minCreatedAt) {
-      request = request.gte('created_at', minCreatedAt);
-    }
   
     const { data, error, count } = await request
       .order('created_at', { ascending: false })
       .range(from, to);
   
-    if (error) {
-      throw new BadRequestException(error.message);
-    }
+    if (error) throw new BadRequestException(error.message);
   
     return {
       data,
-      pagination: {
-        total: count ?? 0,
-        page,
-        limit,
-        totalPages: count ? Math.ceil(count / limit) : 0,
-      },
+      pagination: { total: count ?? 0, page, limit, totalPages: count ? Math.ceil(count / limit) : 0 },
     };
   }
 }

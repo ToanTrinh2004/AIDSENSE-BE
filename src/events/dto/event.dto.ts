@@ -18,7 +18,7 @@ import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 export enum SosType {
   HELP = 'HELP',
   ESSENTIAL = 'ESSENTIAL',
-  TOWING = 'TOWING',
+  FOOD = 'FOOD',
   OTHER = 'OTHER',
   RESCUE = 'RESCUE',
   MEDICAL = 'MEDICAL',
@@ -75,7 +75,7 @@ export class EventDto {
   time_window?: string;
 }
 
-export class UpdateEventDto extends PartialType(EventDto) {}
+export class UpdateEventDto extends PartialType(EventDto) { }
 
 export class ScoreDto {
   @ApiProperty({ example: 3.5, description: 'Khoảng cách (km)', minimum: 0 })
@@ -156,6 +156,28 @@ export class QuerySosDto {
   @IsOptional()
   @IsString()
   search?: string;
+  @ApiPropertyOptional({ example: 'TP. Hồ Chí Minh', description: 'Lọc theo tỉnh/thành phố' })
+  @IsOptional()
+  @IsString()
+  province?: string;
+
+  @ApiPropertyOptional({ example: 10.762622, description: 'Vĩ độ tâm điểm để lọc theo bán kính' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  center_lat?: number;
+
+  @ApiPropertyOptional({ example: 106.660172, description: 'Kinh độ tâm điểm để lọc theo bán kính' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  center_lon?: number;
+
+  @ApiPropertyOptional({ example: 1000, default: 1000, description: 'Bán kính lọc (mét)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  radius_meters?: number = 1000;
 }
 
 
