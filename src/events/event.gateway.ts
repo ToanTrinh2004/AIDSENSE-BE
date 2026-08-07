@@ -12,7 +12,10 @@ import {
   import { JwtService } from '@nestjs/jwt';
   
   @Injectable()
-  @WebSocketGateway({ cors: { origin: '*' } })
+  @WebSocketGateway({
+    namespace: '/user/noti',
+    cors: { origin: '*' },
+  })
   export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
@@ -62,12 +65,10 @@ import {
       console.log(`Client ${client.id} left channel: ${data.channel}`);
     }
   
-    // Gọi từ AdminService khi admin duyệt SOS (REQUESTED -> PENDING)
     emitNewSos(sosData: any) {
       this.server.to('sos-feed').emit('sos:new_request', sosData);
     }
   
-    // Gọi cùng lúc với emitNewSos, để client đang xem bản đồ biết cần fetch lại viewport
     emitMapUpdated(lat: number, lon: number) {
       this.server.to('sos-map').emit('sos:map_updated', { lat, lon });
     }
