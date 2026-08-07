@@ -214,6 +214,67 @@ export class SosService {
     const data = await res.json();
     return data.display_name ?? 'Không xác định';
   }
+  private normalizeProvince(name: string): string | null {
+    const input = name.trim().toLowerCase();
+  
+    const aliases: Record<string, string> = {
+      // Municipalities
+      'hà nội': 'Thành phố Hà Nội',
+      'thành phố hà nội': 'Thành phố Hà Nội',
+  
+      'hải phòng': 'Thành phố Hải Phòng',
+      'thành phố hải phòng': 'Thành phố Hải Phòng',
+  
+      'huế': 'Thành phố Huế',
+      'thành phố huế': 'Thành phố Huế',
+      'thừa thiên huế': 'Thành phố Huế',
+  
+      'đà nẵng': 'Thành phố Đà Nẵng',
+      'thành phố đà nẵng': 'Thành phố Đà Nẵng',
+  
+      'hồ chí minh': 'Thành phố Hồ Chí Minh',
+      'thành phố hồ chí minh': 'Thành phố Hồ Chí Minh',
+      'tp hồ chí minh': 'Thành phố Hồ Chí Minh',
+      'tp. hồ chí minh': 'Thành phố Hồ Chí Minh',
+      'ho chi minh city': 'Thành phố Hồ Chí Minh',
+  
+      'cần thơ': 'Thành phố Cần Thơ',
+      'thành phố cần thơ': 'Thành phố Cần Thơ',
+  
+      // Provinces
+      'cao bằng': 'Cao Bằng',
+      'tuyên quang': 'Tuyên Quang',
+      'điện biên': 'Điện Biên',
+      'lai châu': 'Lai Châu',
+      'sơn la': 'Sơn La',
+      'lào cai': 'Lào Cai',
+      'thái nguyên': 'Thái Nguyên',
+      'lạng sơn': 'Lạng Sơn',
+      'quảng ninh': 'Quảng Ninh',
+      'bắc ninh': 'Bắc Ninh',
+      'phú thọ': 'Phú Thọ',
+      'hưng yên': 'Hưng Yên',
+      'ninh bình': 'Ninh Bình',
+      'thanh hóa': 'Thanh Hóa',
+      'nghệ an': 'Nghệ An',
+      'hà tĩnh': 'Hà Tĩnh',
+      'quảng trị': 'Quảng Trị',
+      'quảng ngãi': 'Quảng Ngãi',
+      'gia lai': 'Gia Lai',
+      'khánh hòa': 'Khánh Hòa',
+      'đắk lắk': 'Đắk Lắk',
+      'lâm đồng': 'Lâm Đồng',
+      'đồng nai': 'Đồng Nai',
+      'tây ninh': 'Tây Ninh',
+      'đồng tháp': 'Đồng Tháp',
+      'vĩnh long': 'Vĩnh Long',
+      'an giang': 'An Giang',
+      'cà mau': 'Cà Mau',
+    };
+  
+    return aliases[input] ?? null;
+  }
+  
   async getProvinceFromCoords(
     lat: number,
     lon: number,
@@ -223,39 +284,41 @@ export class SosService {
         `https://geocode.maps.co/reverse?lat=${lat}&lon=${lon}&api_key=${process.env.GEOCODING_API_KEY}`,
       );
   
-      if (!res.ok) return null;
+      if (!res.ok) {
+        return null;
+      }
   
       const data = await res.json();
-  
       const address = data.address;
   
-      // Ensure location is in Vietnam
+      // Ensure the coordinates are in Vietnam
       if (address?.country_code?.toLowerCase() !== 'vn') {
         return null;
       }
   
-      let province =
-        address.state ??
-        address.province ??
-        address.city ??
-        address.county ??
-        null;
+      const candidates = [
+        address.state,
+        address.province,
+        address.city,
+        address.county,
+        address.state_district,
+      ].filter(Boolean);
   
-      if (!province) return null;
+      for (const candidate of candidates) {
+        const province = this.normalizeProvince(candidate);
+        if (province) {
+          return province;
+        }
+      }
   
-      province = this.normalizeVietnamProvince(province);
+      console.warn(
+        `[getProvinceFromCoords] Cannot map province: ${JSON.stringify(address)}`,
+      );
   
-      return province;
+      return null;
     } catch (err) {
       console.error('[getProvinceFromCoords]', err);
       return null;
     }
-  }
-  
-  private normalizeVietnamProvince(name: string): string {
-    return name
-      .replace(/^Thành phố\s+/i, '')
-      .replace(/^Tỉnh\s+/i, '')
-      .trim();
   }
 }
