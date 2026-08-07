@@ -17,6 +17,8 @@ import {
   ApiBearerAuth,
   ApiConsumes,
   ApiBody,
+  ApiExtraModels,
+  getSchemaPath,
 } from '@nestjs/swagger';
 import { SosService } from './sos.service';
 import { CreateSosDto, ConvertPlaceDto } from './dto/sos.dto';
@@ -30,7 +32,20 @@ export class SosController {
 
   @ApiOperation({ summary: 'Gửi yêu cầu SOS (đã đăng nhập)' })
   @ApiConsumes('multipart/form-data')
-  @ApiBody({ type: CreateSosDto })
+  @ApiBody({
+    schema: {
+      allOf: [
+        { $ref: getSchemaPath(CreateSosDto) },
+        {
+          type: 'object',
+          properties: {
+            image: { type: 'string', format: 'binary', description: 'Ảnh đính kèm' },
+          },
+        },
+      ],
+    },
+  })
+  @ApiExtraModels(CreateSosDto)
   @ApiResponse({ status: 201, description: 'Tạo yêu cầu SOS thành công' })
   @ApiBearerAuth()
   @Throttle({ short: { limit: 5, ttl: 10000 }, medium: { limit: 30, ttl: 60000 } })

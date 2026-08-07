@@ -13,15 +13,17 @@ export class CreateSosDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ example: '10.762622', description: 'Vĩ độ' })
+  @ApiPropertyOptional({ example: 10.762622, description: 'Vĩ độ' })
   @IsOptional()
-  @IsString()
-  lat?: string;
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  lat?: number;
 
-  @ApiPropertyOptional({ example: '106.660172', description: 'Kinh độ' })
+  @ApiPropertyOptional({ example: 106.660172, description: 'Kinh độ' })
   @IsOptional()
-  @IsString()
-  lon?: string;
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  lon?: number;
 
   @ApiPropertyOptional({ example: '123 Nguyen Van Cu, Q5, TPHCM', description: 'Địa chỉ dạng text' })
   @IsOptional()
@@ -35,16 +37,8 @@ export class CreateSosDto {
   })
   phone?: string;
 
-  @ApiPropertyOptional({
-    example: 'PENDING',
-    description: 'Trạng thái yêu cầu',
-    enum: ['PENDING', 'IN_PROGRESS', 'COMPLETE', 'CANCELED'],
-  })
-  @IsOptional()
-  @IsIn(['PENDING', 'IN_PROGRESS', 'COMPLETE', 'CANCELED'])
-  status?: string;
-
   @ApiPropertyOptional({ type: 'string', format: 'binary', description: 'Ảnh đính kèm (tuỳ chọn)' })
+  @IsOptional()
   image?: any;
 }
 

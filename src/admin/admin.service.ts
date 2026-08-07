@@ -11,6 +11,7 @@ import { Messages } from 'src/utils/messages';
 
 import { NotificationService } from 'src/notification/notification.service';
 import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
+import { EventsGateway } from 'src/events/event.gateway';
 
 @Injectable()
 export class AdminService {
@@ -18,6 +19,7 @@ export class AdminService {
     private jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly notificationService: NotificationService,
+    private readonly eventsGateway: EventsGateway
   ) { }
 
   async getAllUsers(limit: number, page: number) {
@@ -113,6 +115,43 @@ export class AdminService {
     return {
       success: true,
       data
+    };
+  }
+
+  async approveSos(eventId: string) {
+    const { data: existing, error: fetchError } = await this.supabase
+      .from('sos_request')
+      .select('*')
+      .eq('id', eventId)
+      .single();
+  
+    if (fetchError || !existing) {
+      throw new BadRequestException('Không tìm thấy yêu cầu SOS');
+    }
+  
+    if (existing.status !== 'REQUESTED') {
+      throw new BadRequestException('Yêu cầu SOS này không ở trạng thái chờ duyệt');
+    }
+  
+    const { data, error } = await this.supabase
+      .from('sos_request')
+      .update({ status: 'PENDING' })
+      .eq('id', eventId)
+      .select()
+      .single();
+  
+    if (error) {
+      throw new Error(error.message);
+    }
+  
+    // Emit real-time — CHỈ khi duyệt thành công, không phải lúc tạo
+    this.eventsGateway.emitNewSos(data);
+    this.eventsGateway.emitMapUpdated(data.lat, data.lon);
+  
+    return {
+      success: true,
+      message: 'Duyệt yêu cầu SOS thành công',
+      data,
     };
   }
   async updateUser(userId: string, updateData: UpdateUserDto) {

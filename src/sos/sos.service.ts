@@ -113,7 +113,7 @@ export class SosService {
 
       if (originError) throw new Error(originError.message);
 
-      // Non-blocking — response returns immediately
+      
       this.processAiInBackground(origin.id, origin.description, sos.id);
 
       return {

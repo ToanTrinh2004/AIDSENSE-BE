@@ -10,7 +10,7 @@ import { AuthGuard } from 'src/auth/auth.guard';
 import { RolesGuard } from 'src/roles.guard';
 import { Roles } from 'src/roles.decorator';
 import { Public } from 'src/public.decorator';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
 
 @UseGuards(AuthGuard, RolesGuard)
@@ -104,5 +104,12 @@ export class AdminController {
   @Post('/broadcast')
   async broadcastNotification(@Body() dto: BroadcastNotificationDto) {
     return this.adminService.broadcastNotification(dto);
+  }
+  @Public()
+  @ApiOperation({ summary: 'Duyệt yêu cầu SOS (REQUESTED -> PENDING)' })
+  @ApiParam({ name: 'eventId', description: 'ID yêu cầu SOS' })
+  @Post('approve/events/:eventId')
+  async approveSosByAdmin(@Param('eventId') eventId: string) {
+    return this.adminService.approveSos(eventId);
   }
 }

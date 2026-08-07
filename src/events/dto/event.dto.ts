@@ -9,6 +9,8 @@ import {
   IsEnum,
   Min,
   Max,
+  IsInt,
+  IsUUID,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
@@ -100,4 +102,98 @@ export class ScoreDto {
   @IsNumber()
   @Min(0)
   llm_score: number;
+}
+
+
+
+export class QuerySosDto {
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ example: 20, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 20;
+
+  @ApiPropertyOptional({ example: 'PENDING', description: 'Lọc theo trạng thái SOS' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: 'HELP', description: 'Lọc theo loại SOS' })
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-of-user', description: 'Lọc theo người tạo SOS' })
+  @IsOptional()
+  @IsUUID()
+  userid?: string;
+
+  @ApiPropertyOptional({ example: 'uuid-of-team', description: 'Lọc theo đội đang phụ trách' })
+  @IsOptional()
+  @IsUUID()
+  teamId?: string;
+
+  @ApiPropertyOptional({ example: '24h', enum: ['12h', '24h', '48h'], description: 'Lọc theo khoảng thời gian gần đây' })
+  @IsOptional()
+  @IsIn(['12h', '24h', '48h'])
+  time_window?: string;
+
+  @ApiPropertyOptional({ example: true, description: 'Lọc SOS đã được AI chỉnh sửa mô tả' })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  is_ai_edited?: boolean;
+
+  @ApiPropertyOptional({ example: 'ngập nước', description: 'Tìm kiếm theo mô tả hoặc địa chỉ' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+
+export class ViewportQueryDto {
+  @ApiProperty({ example: 10.85, description: 'Vĩ độ phía Bắc viewport' })
+  @Type(() => Number)
+  @IsNumber()
+  north: number;
+
+  @ApiProperty({ example: 10.70, description: 'Vĩ độ phía Nam viewport' })
+  @Type(() => Number)
+  @IsNumber()
+  south: number;
+
+  @ApiProperty({ example: 106.75, description: 'Kinh độ phía Đông viewport' })
+  @Type(() => Number)
+  @IsNumber()
+  east: number;
+
+  @ApiProperty({ example: 106.60, description: 'Kinh độ phía Tây viewport' })
+  @Type(() => Number)
+  @IsNumber()
+  west: number;
+
+  @ApiProperty({ example: 13, description: 'Mức zoom hiện tại của bản đồ' })
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(21)
+  zoom: number;
+
+  @ApiPropertyOptional({ example: 'PENDING', description: 'Lọc theo trạng thái SOS' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: '24h', enum: ['12h', '24h', '48h'], description: 'Lọc theo khoảng thời gian gần đây' })
+  @IsOptional()
+  @IsIn(['12h', '24h', '48h'])
+  time_window?: string;
 }
