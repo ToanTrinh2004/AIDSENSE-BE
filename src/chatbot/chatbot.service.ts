@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CreateChatbotDto } from './dto/create-chatbot.dto';
 import { UpdateChatbotDto } from './dto/update-chatbot.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -161,5 +161,35 @@ ${query}`;
     if (error) { throw new Error(error.message); }
     return data;
   }
-
+  async getChatHistory(sosId: string, user: any) {
+    const { data: sos } = await this.supabase
+      .from('sos_request')
+      .select('userid, teamId')
+      .eq('id', sosId)
+      .single();
+  
+    if (!sos) throw new BadRequestException('Không tìm thấy SOS');
+  
+    let isAuthorized = sos.userid === user.id;
+    if (!isAuthorized && sos.teamId) {
+      const { data: team } = await this.supabase
+        .from('team_rescue')
+        .select('leader_id')
+        .eq('id', sos.teamId)
+        .single();
+      isAuthorized = team?.leader_id === user.id;
+    }
+  
+    if (!isAuthorized) throw new BadRequestException('Không có quyền xem đoạn chat này');
+  
+    const { data, error } = await this.supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('sos_id', sosId)
+      .order('created_at', { ascending: true });
+  
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+  
 }

@@ -7,6 +7,7 @@ import Redis from 'ioredis';
 import { Messages } from 'src/utils/messages';
 import { FirebaseService } from 'src/firebase/FirebaseService';
 import { NotificationService } from 'src/notification/notification.service';
+import { ChatGateway } from 'src/chatbot/chat.gateway';
 
 @Injectable()
 export class TeamService {
@@ -15,7 +16,9 @@ export class TeamService {
     private readonly cloudinaryService: CloudinaryService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly firebaseService: FirebaseService,
-    private readonly notificationService: NotificationService
+    private readonly notificationService: NotificationService,
+    private readonly chatGateway: ChatGateway
+    
   ) { }
 
   async createTeam(
@@ -111,19 +114,33 @@ export class TeamService {
 
   async supporting(sosId: string, user: any) {
     const teamId = await this.validateApprovedTeam(user);
-    await this.validateSosStatus(sosId, 'PENDING');
-
+    const sos = await this.validateSosStatus(sosId, 'PENDING');
+  
     const { data } = await this.supabase
       .from('sos_request')
       .update({ status: 'IN_PROGRESS', teamId: teamId })
       .eq('id', sosId)
       .select()
       .single();
-
+  
     if (!data) {
       throw new HttpException('Không thuộc đội cứu trợ', HttpStatus.BAD_REQUEST);
     }
-
+  
+    // Thông báo cho user biết có team nhận hỗ trợ + mở chat room
+    await this.notificationService.createAndSend({
+      userId: sos.userid,
+      title: 'Đã có đội cứu hộ nhận hỗ trợ',
+      content: `Đội cứu hộ đã nhận yêu cầu của bạn và đang trên đường tới.`,
+      type: 'sos_request',
+      action: 'supported',
+      requestId: sosId,
+      data: { sos_id: sosId, team_id: teamId },
+      extraPayload: { sos_id: sosId, team_id: teamId },
+    });
+  
+    this.chatGateway.notifyRoomReady(sosId, user.id, sos.userid);
+  
     return {
       message: 'Cứu trợ được chấp nhận',
       data,

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -6,6 +6,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 @Injectable()
 export class FirebaseService {
   private app: App;
+  private readonly logger = new Logger(FirebaseService.name);
 
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
@@ -36,9 +37,11 @@ export class FirebaseService {
         notification: { title, body },
         data: data ?? {},
       });
-      console.log('Push notification sent successfully');
+      this.logger.debug(`Push gửi thành công tới token=${fcmToken.slice(0, 12)}...`);
     } catch (error) {
-      console.error('Error sending push notification:', error.message);
+      this.logger.error(
+        `Lỗi gửi push tới token=${fcmToken.slice(0, 12)}...: ${error.message}`,
+      );
     }
   }
 
@@ -55,7 +58,14 @@ export class FirebaseService {
       .single();
 
     if (error || !user) {
-      console.error('Failed to look up user for push notification:', error?.message);
+      this.logger.error(
+        `Không tìm thấy user=${userId} để gửi push: ${error?.message}`,
+      );
+      return;
+    }
+
+    if (!user.fcm_token_android && !user.fcm_token_ios) {
+      this.logger.warn(`User=${userId} không có FCM token nào -> bỏ qua push`);
       return;
     }
 
@@ -66,6 +76,4 @@ export class FirebaseService {
       await this.sendPush(user.fcm_token_ios, title, body, data);
     }
   }
-
- 
 }

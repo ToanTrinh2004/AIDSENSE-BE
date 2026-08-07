@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtService } from '@nestjs/jwt';
@@ -12,14 +12,18 @@ import { Messages } from 'src/utils/messages';
 import { NotificationService } from 'src/notification/notification.service';
 import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
 import { EventsGateway } from 'src/events/event.gateway';
+import { TeamGateway } from 'src/team/team.gateway';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name)
   constructor(
     private jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly notificationService: NotificationService,
-    private readonly eventsGateway: EventsGateway
+    private readonly eventsGateway: EventsGateway,
+    private readonly teamGateway: TeamGateway,
+    
   ) { }
 
   async getAllUsers(limit: number, page: number) {
@@ -119,35 +123,66 @@ export class AdminService {
   }
 
   async approveSos(eventId: string) {
+    this.logger.log(`approveSos() được gọi cho eventId=${eventId}`);
+ 
     const { data: existing, error: fetchError } = await this.supabase
       .from('sos_request')
       .select('*')
       .eq('id', eventId)
       .single();
-  
+ 
     if (fetchError || !existing) {
+      this.logger.warn(`SOS ${eventId} không tồn tại: ${fetchError?.message}`);
       throw new BadRequestException('Không tìm thấy yêu cầu SOS');
     }
-  
+ 
     if (existing.status !== 'REQUESTED') {
+      this.logger.warn(
+        `SOS ${eventId} sai trạng thái để duyệt: status hiện tại=${existing.status}`,
+      );
       throw new BadRequestException('Yêu cầu SOS này không ở trạng thái chờ duyệt');
     }
-  
+ 
     const { data, error } = await this.supabase
       .from('sos_request')
       .update({ status: 'PENDING' })
       .eq('id', eventId)
       .select()
       .single();
-  
+ 
     if (error) {
+      this.logger.error(`Update status SOS ${eventId} lỗi: ${error.message}`);
       throw new Error(error.message);
     }
-  
+ 
+    this.logger.log(
+      `SOS ${eventId} duyệt thành công -> status=PENDING, lat=${data.lat}, lon=${data.lon}`,
+    );
+ 
     // Emit real-time — CHỈ khi duyệt thành công, không phải lúc tạo
     this.eventsGateway.emitNewSos(data);
     this.eventsGateway.emitMapUpdated(data.lat, data.lon);
-  
+ 
+    this.logger.log(`Gọi notifyNearbyTeams() cho SOS ${data.id}`);
+ 
+    this.teamGateway
+      .notifyNearbyTeams({
+        id: data.id,
+        lat: data.lat,
+        lon: data.lon,
+        description: data.description,
+        type: data.type,
+      })
+      .then(() =>
+        this.logger.log(`notifyNearbyTeams() hoàn tất cho SOS ${data.id}`),
+      )
+      .catch((err) =>
+        this.logger.error(
+          `notifyNearbyTeams() LỖI cho SOS ${data.id}: ${err?.message ?? err}`,
+          err?.stack,
+        ),
+      );
+ 
     return {
       success: true,
       message: 'Duyệt yêu cầu SOS thành công',

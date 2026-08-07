@@ -1,5 +1,5 @@
 
-import { IsString, IsOptional, IsIn, IsNotEmpty, IsEmail, Matches, IsInt, Min, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsNotEmpty, IsEmail, Matches, IsInt, Min, IsUUID, IsNumber, IsBoolean, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -159,3 +159,25 @@ export class GetUserInfoQueryDto {
   userId?: string;
 }
 export class UpdateTeamInfoDto extends PartialType(CreateTeamDto) {}
+
+export class UpdateLocationDto {
+  @ApiProperty({ example: 10.762622 })
+  @IsNumber()
+  lat: number;
+
+  @ApiProperty({ example: 106.660172 })
+  @IsNumber()
+  lon: number;
+}
+
+export class ToggleLiveModeDto {
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  active: boolean;
+
+  @ApiProperty({ example: 1000, minimum: 1, maximum: 50000, description: 'Bán kính nhận thông báo SOS (m)' })
+  @IsNumber()
+  @Min(1000)
+  @Max(500000)
+  radius_meters: number;
+}

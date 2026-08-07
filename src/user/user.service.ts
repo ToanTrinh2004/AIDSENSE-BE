@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { UpdateProfileDto } from './dto/user.dto';
+import { QueryMySosDto, UpdateProfileDto } from './dto/user.dto';
 import { Messages } from 'src/utils/messages';
 
 @Injectable()
@@ -11,23 +11,46 @@ export class UserService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  async viewMySosRequests(user: any) {
+  async viewMySosRequests(user: any, query: QueryMySosDto) {
     const userId = user.id;
-    const { data, error } = await this.supabase
+  
+    const { page = 1, limit = 10 } = query;
+  
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+  
+    const { data, error, count } = await this.supabase
       .from('sos_request')
-      .select(`
+      .select(
+        `
         *,
         team_rescue (
           name,
           leader,
           phone
         )
-      `)
-      .eq('userid', userId);
+        `,
+        {
+          count: 'exact',
+        },
+      )
+      .eq('userid', userId)
+      .order('created_at', { ascending: false })
+      .range(from, to);
+  
     if (error) {
       throw new Error(error.message);
     }
-    return data;
+  
+    return {
+      data,
+      pagination: {
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0,
+      },
+    };
   }
 
   async cancelSosRequest(sosId: string, user: any) {

@@ -1,5 +1,5 @@
-import { IsOptional, IsString, IsDateString, IsInt, IsEmail, Matches, IsNotEmpty, IsIn } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsOptional, IsString, IsDateString, IsInt, IsEmail, Matches, IsNotEmpty, IsIn, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -52,4 +52,26 @@ export class UpdateFcmTokenDto {
   @ApiProperty({ example: 'android', enum: ['android', 'ios'], description: 'Nền tảng thiết bị' })
   @IsIn(['android', 'ios'], { message: 'Platform không hợp lệ' })
   platform: 'android' | 'ios';
+}
+
+export class QueryMySosDto {
+  @ApiPropertyOptional({
+    example: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    example: 10,
+    default: 10,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 10;
 }

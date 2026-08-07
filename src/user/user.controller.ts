@@ -10,6 +10,7 @@ import {
   Req,
   UseInterceptors,
   UploadedFile,
+  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -21,7 +22,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { UpdateFcmTokenDto, UpdateProfileDto } from './dto/user.dto';
+import { QueryMySosDto, UpdateFcmTokenDto, UpdateProfileDto } from './dto/user.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -30,7 +31,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 @ApiBearerAuth()
 @Controller('user')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService) { }
 
   @ApiOperation({ summary: 'Xem thông tin cá nhân' })
   @ApiResponse({ status: 200, description: 'Thông tin profile' })
@@ -42,12 +43,18 @@ export class UserController {
   }
 
   @ApiOperation({ summary: 'Xem tất cả yêu cầu SOS của mình' })
-  @ApiResponse({ status: 200, description: 'Danh sách SOS của bản thân' })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách SOS của bản thân',
+  })
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Get('profile/sos')
-  async viewMySosRequests(@Req() req) {
-    return this.userService.viewMySosRequests(req.user);
+  async viewMySosRequests(
+    @Req() req,
+    @Query() query: QueryMySosDto,
+  ) {
+    return this.userService.viewMySosRequests(req.user, query);
   }
 
   @ApiOperation({ summary: 'Hủy yêu cầu SOS của mình' })
@@ -86,7 +93,7 @@ export class UserController {
     return this.userService.updateProfile(req.user, updateProfileDto, avatar);
   }
 
- 
+
   @ApiOperation({ summary: 'Tìm người dùng cùng tỉnh/thành phố' })
   @ApiResponse({ status: 200, description: 'Danh sách người dùng cùng tỉnh' })
   @Get('profile/same-province')
@@ -96,11 +103,11 @@ export class UserController {
     return this.userService.findUsersBySameProvince(req.user);
   }
   @ApiOperation({ summary: 'Cập nhật FCM token' })
-@ApiResponse({ status: 200, description: 'Cập nhật thành công' })
-@HttpCode(200)
-@UseGuards(AuthGuard)
-@Patch('fcm-token')
-async updateFcmToken(@Req() req, @Body() dto: UpdateFcmTokenDto) {
-  return this.userService.updateFcmToken(req.user, dto.fcm_token, dto.platform);
-}
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
+  @HttpCode(200)
+  @UseGuards(AuthGuard)
+  @Patch('fcm-token')
+  async updateFcmToken(@Req() req, @Body() dto: UpdateFcmTokenDto) {
+    return this.userService.updateFcmToken(req.user, dto.fcm_token, dto.platform);
+  }
 }

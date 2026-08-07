@@ -1,26 +1,27 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 import { Messages } from '../utils/messages';
 import { QueryNotificationDto } from './dto/notification.dto';
 import { FirebaseService } from 'src/firebase/FirebaseService';
-import { BroadcastNotificationDto } from 'src/firebase/NotificationPayloadDto';
-
+import { BroadcastNotificationDto, NotificationType } from 'src/firebase/NotificationPayloadDto';
 
 export interface CreateNotificationParams {
   userId: string;
   title: string;
   content: string;
   imageUrl?: string;
-  type: string;
+  type: NotificationType | string;
   action?: string;
   requestId?: string;
-  data?: Record<string, any>;        
-  extraPayload?: Record<string, any>; 
+  data?: Record<string, any>;
+  extraPayload?: Record<string, any>;
 }
 
 @Injectable()
 export class NotificationService {
+  private readonly logger = new Logger(NotificationService.name);
+
   constructor(
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
     private readonly firebaseService: FirebaseService,
@@ -45,9 +46,21 @@ export class NotificationService {
       .single();
 
     if (error) {
-      console.error('Failed to create notification:', error.message);
-      return null;
+      // Log đầy đủ chi tiết lỗi (code, message, hint) thay vì nuốt âm thầm.
+      // Lỗi phổ biến nhất ở đây là: type value không nằm trong enum/CHECK constraint
+      // của cột `type` trong bảng notifications -> cần ALTER TYPE thêm value mới.
+      this.logger.error(
+        `Insert notification THẤT BẠI cho user=${userId}, type=${type}: ` +
+        `code=${error.code}, message=${error.message}, details=${error.details}, hint=${error.hint}`,
+      );
+      throw new BadRequestException(
+        `Không thể tạo notification (type=${type}): ${error.message}`,
+      );
     }
+
+    this.logger.log(
+      `Đã tạo notification id=${notification.id} cho user=${userId}, type=${type}`,
+    );
 
     const fcmData: Record<string, string> = {
       notification_id: notification.id,
@@ -60,7 +73,16 @@ export class NotificationService {
     if (requestId) fcmData.request_id = requestId;
     if (extraPayload) fcmData.payload = JSON.stringify(extraPayload);
 
-    await this.firebaseService.sendPushToUser(userId, title, content, fcmData);
+    try {
+      await this.firebaseService.sendPushToUser(userId, title, content, fcmData);
+      this.logger.debug(`Đã gửi FCM cho user=${userId} (notification=${notification.id})`);
+    } catch (pushErr) {
+      // Notification đã lưu DB thành công, chỉ push FCM lỗi -> không throw,
+      // chỉ log để không làm hỏng flow của caller (vd: notifyNearbyTeams).
+      this.logger.error(
+        `Gửi FCM lỗi cho user=${userId} (notification=${notification.id}): ${pushErr?.message ?? pushErr}`,
+      );
+    }
 
     return notification;
   }
@@ -85,7 +107,7 @@ export class NotificationService {
       title,
       content,
       image_url,
-      type: 'announcement',
+      type: NotificationType.ANNOUNCEMENT,
       action: 'broadcast',
     }));
 
@@ -95,6 +117,7 @@ export class NotificationService {
       .select('id, user_id, created_at');
 
     if (insertError) {
+      this.logger.error(`Broadcast insert lỗi: ${insertError.message}`);
       throw new BadRequestException(insertError.message);
     }
 
@@ -114,20 +137,25 @@ export class NotificationService {
 
       const fcmData = {
         notification_id: notification.id,
-        type: 'announcement',
+        type: NotificationType.ANNOUNCEMENT,
         action: 'broadcast',
         title,
         content,
         time: notification.created_at,
       };
 
-      if (u.fcm_token_android) {
-        await this.firebaseService.sendPush(u.fcm_token_android, title, content, fcmData);
+      try {
+        if (u.fcm_token_android) {
+          await this.firebaseService.sendPush(u.fcm_token_android, title, content, fcmData);
+        }
+        if (u.fcm_token_ios) {
+          await this.firebaseService.sendPush(u.fcm_token_ios, title, content, fcmData);
+        }
+        sent++;
+      } catch (err) {
+        this.logger.error(`Broadcast push lỗi cho user=${u.id}: ${err?.message ?? err}`);
+        failed++;
       }
-      if (u.fcm_token_ios) {
-        await this.firebaseService.sendPush(u.fcm_token_ios, title, content, fcmData);
-      }
-      sent++;
     }
 
     return {
@@ -170,37 +198,68 @@ export class NotificationService {
   }
 
   async getNotifications(userId: string, query: QueryNotificationDto) {
-    const { page = 1, limit = 10, unread_only } = query;
+    const {
+      page = 1,
+      limit = 10,
+      unread_only,
+      type,
+      exclude_type,
+    } = query;
+
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-  
+
     let request = this.supabase
       .from('notifications')
-      .select('id, title, content, image_url, type, action, request_id, is_read, created_at', { count: 'exact' })
+      .select(
+        'id, title, content, image_url, type, action, request_id, is_read, created_at',
+        { count: 'exact' },
+      )
       .eq('user_id', userId);
-  
+
     if (unread_only) {
       request = request.eq('is_read', false);
     }
-  
+
+    if (type) {
+      request = request.eq('type', type);
+    }
+
+    if (exclude_type) {
+      request = request.neq('type', exclude_type);
+    }
+
     const { data, error, count } = await request
       .order('created_at', { ascending: false })
       .range(from, to);
-  
+
     if (error) {
       throw new BadRequestException(error.message);
     }
-  
-    const { count: unreadCount, error: unreadError } = await this.supabase
+
+    let unreadRequest = this.supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('is_read', false);
-  
+
+    if (type) {
+      unreadRequest = unreadRequest.eq('type', type);
+    }
+
+    if (exclude_type) {
+      unreadRequest = unreadRequest.neq('type', exclude_type);
+    }
+
+    const {
+      count: unreadCount,
+      error: unreadError,
+    } = await unreadRequest;
+
     if (unreadError) {
       throw new BadRequestException(unreadError.message);
     }
-  
+
     return {
       data,
       unread_count: unreadCount ?? 0,
@@ -212,6 +271,7 @@ export class NotificationService {
       },
     };
   }
+
   async getNotificationDetail(notificationId: string, userId: string) {
     const { data, error } = await this.supabase
       .from('notifications')
