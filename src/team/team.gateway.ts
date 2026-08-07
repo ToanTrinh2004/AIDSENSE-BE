@@ -12,7 +12,7 @@ import {
   import { SupabaseClient } from '@supabase/supabase-js';
   import { NotificationService } from 'src/notification/notification.service';
   
-  const LOCATION_TTL_SECONDS = 90;
+  const LOCATION_TTL_SECONDS = 360;
   const LOCATION_KEY_PREFIX = 'live_location:';
   
   @Injectable()
