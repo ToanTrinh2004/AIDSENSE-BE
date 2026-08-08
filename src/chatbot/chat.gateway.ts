@@ -1,142 +1,183 @@
 import {
-    WebSocketGateway,
-    WebSocketServer,
-    SubscribeMessage,
-    MessageBody,
-    ConnectedSocket,
-  } from '@nestjs/websockets';
-  import { Server, Socket } from 'socket.io';
-  import { Inject, Injectable } from '@nestjs/common';
-  import { JwtService } from '@nestjs/jwt';
-  import { SupabaseClient } from '@supabase/supabase-js';
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { NotificationService } from 'src/notification/notification.service';
-  
-  @Injectable()
-  @WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
-  export class ChatGateway {
-    @WebSocketServer()
-    server: Server;
-  
-    constructor(
-      private readonly jwtService: JwtService,
-      @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-      private readonly notificationService: NotificationService,
-    ) {}
-  
-    private async getUserFromSocket(client: Socket): Promise<any | null> {
-      const token = client.handshake.auth?.token;
-      if (!token) return null;
-      try {
-        return await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET });
-      } catch {
-        return null;
-      }
+
+@Injectable()
+@WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
+export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer()
+  server: Server;
+
+  private readonly logger = new Logger(ChatGateway.name);
+
+  constructor(
+    private readonly jwtService: JwtService,
+    @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
+    private readonly notificationService: NotificationService,
+  ) {}
+
+  private async getUserFromSocket(client: Socket): Promise<any | null> {
+    const token = client.handshake.auth?.token;
+    if (!token) {
+      this.logger.warn(`Client ${client.id} has no token`);
+      return null;
     }
-  
-    private roomName(sosId: string): string {
-      return `chat:${sosId}`;
+    try {
+      const payload = await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET });
+      return payload;
+    } catch (err) {
+      this.logger.warn(`Client ${client.id} invalid token: ${err.message}`);
+      return null;
     }
-  
-    // Leader hoặc user tạo SOS join room chat sau khi đã accept
-    @SubscribeMessage('chat:join')
-    async handleJoinChat(
-      @ConnectedSocket() client: Socket,
-      @MessageBody() data: { sos_id: string },
-    ) {
-      const user = await this.getUserFromSocket(client);
-      if (!user) return;
-  
-      // Xác thực: chỉ leader của team đang xử lý SOS này, hoặc user tạo SOS này mới được join
-      const { data: sos } = await this.supabase
-        .from('sos_request')
-        .select('userid, teamId')
-        .eq('id', data.sos_id)
-        .single();
-  
-      if (!sos) return;
-  
-      let isAuthorized = sos.userid === user.id;
-  
-      if (!isAuthorized && sos.teamId) {
-        const { data: team } = await this.supabase
-          .from('team_rescue')
-          .select('leader_id')
-          .eq('id', sos.teamId)
-          .single();
-        isAuthorized = team?.leader_id === user.id;
-      }
-  
-      if (!isAuthorized) return;
-  
-      client.join(this.roomName(data.sos_id));
+  }
+
+  private roomName(sosId: string): string {
+    return `chat:${sosId}`;
+  }
+
+  async handleConnection(client: Socket) {
+    const user = await this.getUserFromSocket(client);
+    if (!user) {
+      this.logger.warn(`Rejecting connection ${client.id} — invalid/missing token`);
+      client.disconnect();
+      return;
     }
-  
-    @SubscribeMessage('chat:send_message')
-async handleSendMessage(
-  @ConnectedSocket() client: Socket,
-  @MessageBody() data: { sos_id: string; content: string },
-) {
-  const user = await this.getUserFromSocket(client);
-  if (!user) return;
+    this.logger.log(`Client connected: ${client.id}, user: ${user.id}`);
+  }
 
-  const { data: message, error } = await this.supabase
-    .from('chat_messages')
-    .insert([{ sos_id: data.sos_id, sender_id: user.id, content: data.content }])
-    .select()
-    .single();
+  handleDisconnect(client: Socket) {
+    this.logger.log(`Client disconnected: ${client.id}`);
+  }
 
-  if (error) return;
+  @SubscribeMessage('chat:join')
+  async handleJoinChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sos_id: string },
+  ) {
+    const user = await this.getUserFromSocket(client);
+    if (!user) return;
 
-  this.server.to(this.roomName(data.sos_id)).emit('chat:new_message', message);
+    this.logger.log(`User ${user.id} attempting to join chat for sos_id=${data.sos_id}`);
 
-  // Xác định người nhận (không phải người vừa gửi) để bắn FCM
-  const { data: sos } = await this.supabase
-    .from('sos_request')
-    .select('userid, teamId')
-    .eq('id', data.sos_id)
-    .single();
+    const { data: sos, error: sosError } = await this.supabase
+      .from('sos_request')
+      .select('userid, teamId')
+      .eq('id', data.sos_id)
+      .single();
 
-  if (!sos) return;
+    if (sosError || !sos) {
+      this.logger.warn(`join failed — sos_id ${data.sos_id} not found: ${sosError?.message}`);
+      return;
+    }
 
-  let recipientId: string | null = null;
+    let isAuthorized = sos.userid === user.id;
 
-  if (sos.userid === user.id) {
-    // Người gửi là user (nạn nhân) -> người nhận là leader của team
-    if (sos.teamId) {
+    if (!isAuthorized && sos.teamId) {
       const { data: team } = await this.supabase
         .from('team_rescue')
         .select('leader_id')
         .eq('id', sos.teamId)
         .single();
-      recipientId = team?.leader_id ?? null;
+      isAuthorized = team?.leader_id === user.id;
     }
-  } else {
-    // Người gửi là leader -> người nhận là user (nạn nhân)
-    recipientId = sos.userid;
+
+    if (!isAuthorized) {
+      this.logger.warn(`User ${user.id} UNAUTHORIZED to join chat for sos_id=${data.sos_id}`);
+      return;
+    }
+
+    client.join(this.roomName(data.sos_id));
+    this.logger.log(`User ${user.id} joined room ${this.roomName(data.sos_id)}`);
   }
 
-  if (!recipientId) return;
+  @SubscribeMessage('chat:send_message')
+  async handleSendMessage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { sos_id: string; content: string },
+  ) {
+    const user = await this.getUserFromSocket(client);
+    if (!user) return;
 
-  const { data: senderInfo } = await this.supabase
-    .from('users')
-    .select('username')
-    .eq('id', user.id)
-    .single();
+    this.logger.log(`User ${user.id} sending message to sos_id=${data.sos_id}: "${data.content}"`);
 
-  await this.notificationService.createAndSend({
-    userId: recipientId,
-    title: senderInfo?.username || 'Tin nhắn mới',
-    content: data.content,
-    type: 'chat',
-    action: 'new_message',
-    requestId: data.sos_id,
-    data: { sos_id: data.sos_id, sender_id: user.id, message_id: message.id },
-    extraPayload: { sos_id: data.sos_id, sender_id: user.id, sender_name: senderInfo?.username },
-  });
+    const { data: message, error } = await this.supabase
+      .from('chat_messages')
+      .insert([{ sos_id: data.sos_id, sender_id: user.id, content: data.content }])
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to insert chat message: ${error.message}`);
+      return;
+    }
+
+    this.server.to(this.roomName(data.sos_id)).emit('chat:new_message', message);
+    this.logger.log(`Message ${message.id} emitted to room ${this.roomName(data.sos_id)}`);
+
+    const { data: sos } = await this.supabase
+      .from('sos_request')
+      .select('userid, teamId')
+      .eq('id', data.sos_id)
+      .single();
+
+    if (!sos) {
+      this.logger.warn(`Cannot resolve recipient — sos_id ${data.sos_id} not found`);
+      return;
+    }
+
+    let recipientId: string | null = null;
+
+    if (sos.userid === user.id) {
+      if (sos.teamId) {
+        const { data: team } = await this.supabase
+          .from('team_rescue')
+          .select('leader_id')
+          .eq('id', sos.teamId)
+          .single();
+        recipientId = team?.leader_id ?? null;
+      }
+    } else {
+      recipientId = sos.userid;
+    }
+
+    if (!recipientId) {
+      this.logger.warn(`No recipient resolved for sos_id=${data.sos_id}, sender=${user.id}`);
+      return;
+    }
+
+    const { data: senderInfo } = await this.supabase
+      .from('users')
+      .select('username')
+      .eq('id', user.id)
+      .single();
+
+    this.logger.log(`Sending FCM notification to recipient=${recipientId}`);
+
+    await this.notificationService.createAndSend({
+      userId: recipientId,
+      title: senderInfo?.username || 'Tin nhắn mới',
+      content: data.content,
+      type: 'chat',
+      action: 'new_message',
+      requestId: data.sos_id,
+      data: { sos_id: data.sos_id, sender_id: user.id, message_id: message.id },
+      extraPayload: { sos_id: data.sos_id, sender_id: user.id, sender_name: senderInfo?.username },
+    });
+  }
+
+  notifyRoomReady(sosId: string, leaderId: string, userId: string) {
+    this.logger.log(`Room ready for sos_id=${sosId}, leader=${leaderId}, user=${userId}`);
+    this.server.emit('chat:room_ready', { sos_id: sosId, leader_id: leaderId, user_id: userId });
+  }
 }
-  
-    // Gọi từ TeamService khi leader accept SOS, báo cho cả 2 phía biết room đã sẵn sàng
-    notifyRoomReady(sosId: string, leaderId: string, userId: string) {
-      this.server.emit('chat:room_ready', { sos_id: sosId, leader_id: leaderId, user_id: userId });
-    }
-  }
