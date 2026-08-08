@@ -139,7 +139,7 @@ export class TeamService {
       extraPayload: { sos_id: sosId, team_id: teamId },
     });
   
-    this.chatGateway.notifyRoomReady(sosId, user.id, sos.userid);
+    await this.chatGateway.notifyRoomReady(sosId, user.id, sos.userid);
   
     return {
       message: 'Cứu trợ được chấp nhận',

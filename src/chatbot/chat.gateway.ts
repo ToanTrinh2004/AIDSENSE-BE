@@ -20,6 +20,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
+  private onlineUsers = new Map<string, Set<string>>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -29,20 +30,32 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private async getUserFromSocket(client: Socket): Promise<any | null> {
     const token = client.handshake.auth?.token;
-    if (!token) {
-      this.logger.warn(`Client ${client.id} has no token`);
-      return null;
-    }
+    if (!token) return null;
     try {
       return await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET });
-    } catch (err) {
-      this.logger.warn(`Client ${client.id} invalid token: ${err.message}`);
+    } catch {
       return null;
     }
   }
 
   private roomName(sosId: string): string {
     return `chat:${sosId}`;
+  }
+
+  private async getUserInfo(userId: string) {
+    const { data, error } = await this.supabase
+      .from('users')
+      .select('id, username, avatar')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) return null;
+
+    return {
+      userId: data.id,
+      name: data.username,
+      avatar: data.avatar,
+    };
   }
 
   async handleConnection(client: Socket) {
@@ -52,11 +65,33 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.disconnect();
       return;
     }
+
+    client.data.user = user;
+
+    if (!this.onlineUsers.has(user.id)) {
+      this.onlineUsers.set(user.id, new Set());
+    }
+    this.onlineUsers.get(user.id)!.add(client.id);
+
     this.logger.log(`Client connected: ${client.id}, user: ${user.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    const user = client.data?.user;
+    if (user) {
+      const sockets = this.onlineUsers.get(user.id);
+      if (sockets) {
+        sockets.delete(client.id);
+        if (sockets.size === 0) {
+          this.onlineUsers.delete(user.id);
+        }
+      }
+      this.logger.log(`Client disconnected: ${client.id}, user: ${user.id}`);
+    }
+  }
+
+  private isUserOnline(userId: string): boolean {
+    return this.onlineUsers.has(userId) && this.onlineUsers.get(userId)!.size > 0;
   }
 
   @SubscribeMessage('chat:join')
@@ -80,16 +115,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    let isAuthorized = sos.userid === user.id;
-
-    if (!isAuthorized && sos.teamId) {
+    let leaderId: string | null = null;
+    if (sos.teamId) {
       const { data: team } = await this.supabase
         .from('team_rescue')
         .select('leader_id')
         .eq('id', sos.teamId)
         .single();
-      isAuthorized = team?.leader_id === user.id;
+      leaderId = team?.leader_id ?? null;
     }
+
+    const isAuthorized = sos.userid === user.id || leaderId === user.id;
 
     if (!isAuthorized) {
       this.logger.warn(`User ${user.id} UNAUTHORIZED to join chat for sos_id=${data.sos_id}`);
@@ -98,6 +134,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     client.join(this.roomName(data.sos_id));
     this.logger.log(`User ${user.id} joined room ${this.roomName(data.sos_id)}`);
+
+    // Xác định thông tin của "đối phương" để gửi ngược lại cho người vừa join
+    const otherPartyId = sos.userid === user.id ? leaderId : sos.userid;
+    const otherPartyInfo = otherPartyId ? await this.getUserInfo(otherPartyId) : null;
+
+    client.emit('chat:joined', {
+      sos_id: data.sos_id,
+      other_party: otherPartyInfo,
+    });
   }
 
   @SubscribeMessage('chat:send_message')
@@ -155,15 +200,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    if (this.isUserOnline(recipientId)) {
+      this.logger.log(`Recipient ${recipientId} is online — skip FCM`);
+      return;
+    }
+
     const { data: senderInfo } = await this.supabase
       .from('users')
       .select('username')
       .eq('id', user.id)
       .single();
 
-    this.logger.log(`Sending FCM (no DB record) to recipient=${recipientId}`);
+    this.logger.log(`Recipient ${recipientId} is OFFLINE — sending FCM`);
 
-    // Chỉ gửi FCM, không lưu vào bảng notifications
     await this.firebaseService.sendPushToUser(
       recipientId,
       senderInfo?.username || 'Tin nhắn mới',
@@ -178,8 +227,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
-  notifyRoomReady(sosId: string, leaderId: string, userId: string) {
+  // Gọi từ TeamService khi leader accept SOS — báo cả 2 bên, kèm đầy đủ thông tin của nhau
+  async notifyRoomReady(sosId: string, leaderId: string, userId: string) {
     this.logger.log(`Room ready for sos_id=${sosId}, leader=${leaderId}, user=${userId}`);
-    this.server.emit('chat:room_ready', { sos_id: sosId, leader_id: leaderId, user_id: userId });
+
+    const [leaderInfo, userInfo] = await Promise.all([
+      this.getUserInfo(leaderId),
+      this.getUserInfo(userId),
+    ]);
+
+    this.server.emit('chat:room_ready', {
+      sos_id: sosId,
+      leader: leaderInfo,
+      user: userInfo,
+    });
   }
 }

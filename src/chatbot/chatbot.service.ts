@@ -161,7 +161,7 @@ ${query}`;
     if (error) { throw new Error(error.message); }
     return data;
   }
-  async getChatHistory(sosId: string, user: any) {
+  async getChatHistory(sosId: string, user: any, page: number = 1, limit: number = 20) {
     const { data: sos } = await this.supabase
       .from('sos_request')
       .select('userid, teamId')
@@ -182,14 +182,27 @@ ${query}`;
   
     if (!isAuthorized) throw new BadRequestException('Không có quyền xem đoạn chat này');
   
-    const { data, error } = await this.supabase
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+  
+    const { data, error, count } = await this.supabase
       .from('chat_messages')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('sos_id', sosId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false }) // mới nhất trước
+      .range(from, to);
   
     if (error) throw new BadRequestException(error.message);
-    return data;
+  
+    return {
+      data,
+      pagination: {
+        total: count ?? 0,
+        page,
+        limit,
+        totalPages: count ? Math.ceil(count / limit) : 0,
+      },
+    };
   }
   
 }

@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class ChatMessageDto {
   @ApiProperty({ example: 'Làm sao để đăng ký tài khoản?', description: 'Nội dung tin nhắn gửi cho chatbot' })
@@ -24,4 +25,19 @@ export class SendMessageDto {
   @IsNotEmpty()
   @IsString()
   content: string;
+}
+export class QueryChatHistoryDto {
+  @ApiPropertyOptional({ example: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ example: 20, default: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 20;
 }
