@@ -170,16 +170,17 @@ ${query}`;
   
     if (!sos) throw new BadRequestException('Không tìm thấy SOS');
   
-    let isAuthorized = sos.userid === user.id;
-    if (!isAuthorized && sos.teamId) {
+    let leaderId: string | null = null;
+    if (sos.teamId) {
       const { data: team } = await this.supabase
         .from('team_rescue')
         .select('leader_id')
         .eq('id', sos.teamId)
         .single();
-      isAuthorized = team?.leader_id === user.id;
+      leaderId = team?.leader_id ?? null;
     }
   
+    const isAuthorized = sos.userid === user.id || leaderId === user.id;
     if (!isAuthorized) throw new BadRequestException('Không có quyền xem đoạn chat này');
   
     const from = (page - 1) * limit;
@@ -189,13 +190,34 @@ ${query}`;
       .from('chat_messages')
       .select('*', { count: 'exact' })
       .eq('sos_id', sosId)
-      .order('created_at', { ascending: false }) // mới nhất trước
+      .order('created_at', { ascending: false })
       .range(from, to);
   
     if (error) throw new BadRequestException(error.message);
   
+    // Xác định đối phương và lấy thông tin của họ
+    const otherPartyId = sos.userid === user.id ? leaderId : sos.userid;
+  
+    let otherParty: { userId: string; name: string; avatar: string | null } | null = null;
+    if (otherPartyId) {
+      const { data: partyData } = await this.supabase
+        .from('users')
+        .select('id, username, avatar')
+        .eq('id', otherPartyId)
+        .single();
+  
+      if (partyData) {
+        otherParty = {
+          userId: partyData.id,
+          name: partyData.username,
+          avatar: partyData.avatar,
+        };
+      }
+    }
+  
     return {
       data,
+      other_party: otherParty,
       pagination: {
         total: count ?? 0,
         page,
