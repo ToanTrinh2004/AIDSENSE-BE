@@ -125,5 +125,5 @@ export const Messages = {
     vi: 'Mật khẩu mới không được trùng mật khẩu cũ',
     en: 'New password must be different from the current password',
   },
- 
+
 };
