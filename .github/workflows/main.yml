@@ -1,63 +1,44 @@
-name: Test AidSense SSH
+name: Deploy AidSense Backend
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  test-ssh:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Show SSH target
-        run: |
-          echo "================================"
-          echo "SSH Target"
-          echo "================================"
-          echo "Testing host: 3.104.38.78"
-          echo "Testing user: ubuntu"
-          echo "Port: 22"
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
 
-      - name: Prepare SSH key
-        shell: bash
-        run: |
-          echo "================================"
-          echo "Preparing SSH key"
-          echo "================================"
+            echo "================================"
+            echo "AidSense Deployment"
+            echo "================================"
 
-          printf '%s\n' '${{ secrets.EC2_SSH_KEY }}' > "$RUNNER_TEMP/ec2_key"
+            cd /home/ubuntu/AIDSENSE-BE
 
-          chmod 600 "$RUNNER_TEMP/ec2_key"
+            echo "=== Pull latest code ==="
+            git fetch origin
+            git reset --hard origin/main
 
-          echo "SSH key fingerprint:"
-          ssh-keygen -lf "$RUNNER_TEMP/ec2_key"
+            echo "=== Current commit ==="
+            git log -1 --oneline
 
-      - name: Test network connection
-        shell: bash
-        run: |
-          echo "================================"
-          echo "Testing network connection"
-          echo "================================"
+            echo "=== Rebuilding Docker containers ==="
+            docker compose up -d --build --remove-orphans
 
-          nc -vz -w 10 3.104.38.78 22
+            echo "=== Container status ==="
+            docker compose ps
 
-      - name: Test SSH connection
-        shell: bash
-        run: |
-          echo "================================"
-          echo "Testing SSH connection"
-          echo "================================"
-
-          ssh \
-            -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=10 \
-            -o PreferredAuthentications=publickey \
-            -o PubkeyAuthentication=yes \
-            -i "$RUNNER_TEMP/ec2_key" \
-            ubuntu@3.104.38.78 \
-            "echo 'SSH_CONNECTION_SUCCESS'; whoami; hostname; pwd"
-
-      - name: SSH test completed
-        run: |
-          echo "================================"
-          echo "SSH TEST PASSED"
-          echo "================================"
+            echo "================================"
+            echo "Deployment completed successfully!"
+            echo "================================"
