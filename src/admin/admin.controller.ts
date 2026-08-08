@@ -113,6 +113,7 @@ export class AdminController {
     return this.adminService.approveSos(eventId);
   }
 
+  @Public()
   @ApiOperation({ summary: 'Duyệt đội cứu hộ (PENDING -> APPROVED)' })
 @ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
 @ApiResponse({ status: 200, description: 'Duyệt đội thành công' })
