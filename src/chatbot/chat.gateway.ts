@@ -11,7 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseClient } from '@supabase/supabase-js';
-import { NotificationService } from 'src/notification/notification.service';
+import { FirebaseService } from 'src/firebase/FirebaseService';
 
 @Injectable()
 @WebSocketGateway({ cors: { origin: '*' }, namespace: '/chat' })
@@ -24,7 +24,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     @Inject('SUPABASE_CLIENT') private readonly supabase: SupabaseClient,
-    private readonly notificationService: NotificationService,
+    private readonly firebaseService: FirebaseService,
   ) {}
 
   private async getUserFromSocket(client: Socket): Promise<any | null> {
@@ -34,8 +34,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return null;
     }
     try {
-      const payload = await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET });
-      return payload;
+      return await this.jwtService.verifyAsync(token, { secret: process.env.JWT_SECRET });
     } catch (err) {
       this.logger.warn(`Client ${client.id} invalid token: ${err.message}`);
       return null;
@@ -162,18 +161,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .eq('id', user.id)
       .single();
 
-    this.logger.log(`Sending FCM notification to recipient=${recipientId}`);
+    this.logger.log(`Sending FCM (no DB record) to recipient=${recipientId}`);
 
-    await this.notificationService.createAndSend({
-      userId: recipientId,
-      title: senderInfo?.username || 'Tin nhắn mới',
-      content: data.content,
-      type: 'chat',
-      action: 'new_message',
-      requestId: data.sos_id,
-      data: { sos_id: data.sos_id, sender_id: user.id, message_id: message.id },
-      extraPayload: { sos_id: data.sos_id, sender_id: user.id, sender_name: senderInfo?.username },
-    });
+    // Chỉ gửi FCM, không lưu vào bảng notifications
+    await this.firebaseService.sendPushToUser(
+      recipientId,
+      senderInfo?.username || 'Tin nhắn mới',
+      data.content,
+      {
+        type: 'chat',
+        action: 'new_message',
+        sos_id: data.sos_id,
+        sender_id: user.id,
+        message_id: message.id,
+      },
+    );
   }
 
   notifyRoomReady(sosId: string, leaderId: string, userId: string) {
