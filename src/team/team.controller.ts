@@ -25,7 +25,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { TeamService } from './team.service';
-import { CreateTeamDto, GetUserInfoQueryDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
+import { CreateTeamDto, GetUserInfoQueryDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, QueryTeamSosDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { AuthGuard } from 'src/auth/auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 
@@ -144,16 +144,45 @@ export class TeamController {
     return this.teamService.kickMember(memberId, req.user, dto);
   }
 
-  @ApiOperation({ summary: 'Xem tất cả request SOS mà team đã/đang hỗ trợ' })
-  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái' })
-  @ApiResponse({ status: 200, description: 'Danh sách SOS đã hỗ trợ' })
+  @ApiOperation({
+    summary: 'Xem tất cả request SOS mà team đã/đang hỗ trợ',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Lọc theo trạng thái',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    example: 1,
+    description: 'Trang hiện tại',
+  })
+  
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    example: 10,
+    description: 'Số lượng mỗi trang',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách SOS đã hỗ trợ',
+  })
   @HttpCode(200)
   @UseGuards(AuthGuard)
   @Get('all-support')
-  async getAllTeams(@Req() req, @Query('status') status: string) {
-    return this.teamService.getSosByTeam(req.user, status);
+  async getAllTeams(
+    @Req() req,
+    @Query('status') status: string,
+    @Query() query: QueryTeamSosDto,
+  ) {
+    return this.teamService.getSosByTeam(
+      req.user,
+      status,
+      query,
+    );
   }
-
   @ApiOperation({ summary: 'Xem danh sách đội cứu hộ đã được duyệt (lọc, tìm kiếm, phân trang)' })
   @ApiResponse({ status: 200, description: 'Danh sách đội cứu hộ đã được duyệt' })
   @HttpCode(200)

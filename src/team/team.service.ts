@@ -1,5 +1,5 @@
 import { Inject, Injectable, HttpException, HttpStatus, BadRequestException, NotFoundException } from '@nestjs/common';
-import { CreateTeamDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
+import { CreateTeamDto, KickMemberDto, QueryJoinRequestsDto, QueryTeamDto, QueryTeamMembersDto, QueryTeamSosDto, RequestJoinTeamDto, RespondJoinRequestDto, UpdateTeamInfoDto } from './dto/team.dto';
 import { UpdateTeamDto } from './dto/team.dto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -8,6 +8,7 @@ import { Messages } from 'src/utils/messages';
 import { FirebaseService } from 'src/firebase/FirebaseService';
 import { NotificationService } from 'src/notification/notification.service';
 import { ChatGateway } from 'src/chatbot/chat.gateway';
+import e from 'express';
 
 @Injectable()
 export class TeamService {
@@ -226,26 +227,77 @@ export class TeamService {
     return data;
   }
 
-  async getSosByTeam(user: any, status?: string) {
-    const teamId = await this.validateApprovedTeam(user);
-
-    const { data, error } = await this.supabase
-      .from('sos_request')
-      .select('*')
-      .eq('teamId', teamId)
-      .eq(status ? 'status' : '', status ? status : '');
-
-    if (error) {
-      throw new HttpException('Không tìm thấy đội cứu trợ', HttpStatus.BAD_REQUEST);
+  async getSosByTeam(
+    user: any,
+    status?: string,
+    query?: QueryTeamSosDto,
+  ) {
+    try {
+      const page = query?.page ?? 1;
+      const limit = query?.limit ?? 10;
+  
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+  
+      const { data: teamMember, error: teamError } = await this.supabase
+        .from('team_members')
+        .select('team_id')
+        .eq('user_id', user.id)
+        .eq('status', 'ACTIVE')
+        .maybeSingle();
+  
+      if (teamError) {
+        throw new BadRequestException(teamError.message);
+      }
+  
+      if (!teamMember) {
+        throw new BadRequestException(Messages.notAMember);
+      }
+  
+      let request = this.supabase
+        .from('sos_request')
+        .select('*', {
+          count: 'exact',
+        })
+        .eq('teamId', teamMember.team_id);
+  
+      if (status) {
+        request = request.eq('status', status);
+      }
+  
+      const {
+        data: sosData,
+        error: sosError,
+        count,
+      } = await request
+        .order('created_at', { ascending: false })
+        .range(from, to);
+  
+      if (sosError) {
+        throw new BadRequestException(sosError.message);
+      }
+  
+      return {
+        data: sosData,
+        pagination: {
+          total: count ?? 0,
+          page,
+          limit,
+          totalPages: count ? Math.ceil(count / limit) : 0,
+        },
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+  
+      throw new BadRequestException(
+        error instanceof Error
+          ? error.message
+          : 'Failed to get SOS requests',
+      );
     }
-
-
-    return {
-      message: 'Lấy danh sách SOS thành công',
-      data,
-    };
   }
-
   async getTeamDetail(teamId: string) {
     const { data: team, error: teamError } = await this.supabase
       .from('team_rescue')

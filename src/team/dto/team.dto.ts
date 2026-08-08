@@ -181,3 +181,24 @@ export class ToggleLiveModeDto {
   @Max(500000)
   radius_meters: number;
 }
+export class QueryTeamSosDto {
+  @ApiPropertyOptional({
+    example: 1,
+    default: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({
+    example: 10,
+    default: 10,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 10;
+}
