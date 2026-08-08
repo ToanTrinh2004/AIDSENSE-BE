@@ -13,8 +13,8 @@ jobs:
           echo "================================"
           echo "SSH Target"
           echo "================================"
-          echo "Host: ${{ secrets.EC2_HOST }}"
-          echo "User: ${{ secrets.EC2_USER }}"
+          echo "Testing host: 3.104.38.78"
+          echo "Testing user: ubuntu"
           echo "Port: 22"
 
       - name: Prepare SSH key
@@ -31,6 +31,15 @@ jobs:
           echo "SSH key fingerprint:"
           ssh-keygen -lf "$RUNNER_TEMP/ec2_key"
 
+      - name: Test network connection
+        shell: bash
+        run: |
+          echo "================================"
+          echo "Testing network connection"
+          echo "================================"
+
+          nc -vz -w 10 3.104.38.78 22
+
       - name: Test SSH connection
         shell: bash
         run: |
@@ -44,7 +53,7 @@ jobs:
             -o PreferredAuthentications=publickey \
             -o PubkeyAuthentication=yes \
             -i "$RUNNER_TEMP/ec2_key" \
-            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            ubuntu@3.104.38.78 \
             "echo 'SSH_CONNECTION_SUCCESS'; whoami; hostname; pwd"
 
       - name: SSH test completed
