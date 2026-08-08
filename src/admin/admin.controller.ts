@@ -112,4 +112,13 @@ export class AdminController {
   async approveSosByAdmin(@Param('eventId') eventId: string) {
     return this.adminService.approveSos(eventId);
   }
+
+  @ApiOperation({ summary: 'Duyệt đội cứu hộ (PENDING -> APPROVED)' })
+@ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
+@ApiResponse({ status: 200, description: 'Duyệt đội thành công' })
+@HttpCode(200)
+@Post('approve/teams/:teamId')
+async approveTeamByAdmin(@Param('teamId') teamId: string) {
+  return this.adminService.approveTeam(teamId);
+}
 }

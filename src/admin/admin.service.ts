@@ -122,6 +122,60 @@ export class AdminService {
     };
   }
 
+  async approveTeam(teamId: string) {
+    this.logger.log(`approveTeam() được gọi cho teamId=${teamId}`);
+  
+    const { data: existing, error: fetchError } = await this.supabase
+      .from('team_rescue')
+      .select('*')
+      .eq('id', teamId)
+      .single();
+  
+    if (fetchError || !existing) {
+      this.logger.warn(`Team ${teamId} không tồn tại: ${fetchError?.message}`);
+      throw new BadRequestException('Không tìm thấy đội cứu hộ');
+    }
+  
+    if (existing.team_status !== 'PENDING') {
+      this.logger.warn(
+        `Team ${teamId} sai trạng thái để duyệt: status hiện tại=${existing.team_status}`,
+      );
+      throw new BadRequestException('Đội này không ở trạng thái chờ duyệt');
+    }
+  
+    const { data, error } = await this.supabase
+      .from('team_rescue')
+      .update({ team_status: 'APPROVED' })
+      .eq('id', teamId)
+      .select()
+      .single();
+  
+    if (error) {
+      this.logger.error(`Update status team ${teamId} lỗi: ${error.message}`);
+      throw new Error(error.message);
+    }
+  
+    this.logger.log(`Team ${teamId} duyệt thành công -> status=APPROVED, leader_id=${data.leader_id}`);
+  
+    // Thông báo cho leader (lưu DB + FCM)
+    await this.notificationService.createAndSend({
+      userId: data.leader_id,
+      title: 'Đội của bạn đã được duyệt',
+      content: `Đội ${data.name} đã được Admin xét duyệt và chính thức hoạt động.`,
+      type: 'team_registration',
+      action: 'approved',
+      requestId: data.id,
+      data: { team: data },
+      extraPayload: { team_id: data.id, team_name: data.name },
+    });
+  
+    return {
+      success: true,
+      message: 'Duyệt đội cứu hộ thành công',
+      data,
+    };
+  }
+
   async approveSos(eventId: string) {
     this.logger.log(`approveSos() được gọi cho eventId=${eventId}`);
  
