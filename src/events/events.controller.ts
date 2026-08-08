@@ -2,6 +2,7 @@ import { Controller, Post, Body, Req, Get, HttpCode, Query } from '@nestjs/commo
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService } from './events.service';
 import { EventDto, QuerySosDto, ViewportQueryDto } from './dto/event.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @ApiTags('Events')
 @Controller('events')
@@ -14,7 +15,7 @@ export class EventsController {
     return this.eventsService.getSosList(query);
   }
 
-
+  @SkipThrottle()
   @ApiOperation({ summary: 'Lấy SOS theo viewport (cluster hoặc marker tùy mật độ/zoom)' })
   @ApiResponse({ status: 200, description: 'Danh sách cluster hoặc marker' })
   @HttpCode(200)
