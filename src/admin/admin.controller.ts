@@ -115,11 +115,11 @@ export class AdminController {
 
   @Public()
   @ApiOperation({ summary: 'Duyệt đội cứu hộ (PENDING -> APPROVED)' })
-@ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
-@ApiResponse({ status: 200, description: 'Duyệt đội thành công' })
-@HttpCode(200)
-@Post('approve/teams/:teamId')
-async approveTeamByAdmin(@Param('teamId') teamId: string) {
-  return this.adminService.approveTeam(teamId);
-}
+  @ApiParam({ name: 'teamId', description: 'ID đội cứu hộ' })
+  @ApiResponse({ status: 200, description: 'Duyệt đội thành công' })
+  @HttpCode(200)
+  @Post('approve/teams/:teamId')
+  async approveTeamByAdmin(@Param('teamId') teamId: string) {
+    return this.adminService.approveTeam(teamId);
+  }
 }
