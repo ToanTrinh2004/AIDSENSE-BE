@@ -1,4 +1,54 @@
-- name: Show SSH target
-  run: |
-    echo "Host: ${{ secrets.EC2_HOST }}"
-    echo "User: ${{ secrets.EC2_USER }}"
+name: Test AidSense SSH
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show SSH target
+        run: |
+          echo "================================"
+          echo "SSH Target"
+          echo "================================"
+          echo "Host: ${{ secrets.EC2_HOST }}"
+          echo "User: ${{ secrets.EC2_USER }}"
+          echo "Port: 22"
+
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          echo "================================"
+          echo "Preparing SSH key"
+          echo "================================"
+
+          printf '%s\n' '${{ secrets.EC2_SSH_KEY }}' > "$RUNNER_TEMP/ec2_key"
+
+          chmod 600 "$RUNNER_TEMP/ec2_key"
+
+          echo "SSH key fingerprint:"
+          ssh-keygen -lf "$RUNNER_TEMP/ec2_key"
+
+      - name: Test SSH connection
+        shell: bash
+        run: |
+          echo "================================"
+          echo "Testing SSH connection"
+          echo "================================"
+
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o PreferredAuthentications=publickey \
+            -o PubkeyAuthentication=yes \
+            -i "$RUNNER_TEMP/ec2_key" \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            "echo 'SSH_CONNECTION_SUCCESS'; whoami; hostname; pwd"
+
+      - name: SSH test completed
+        run: |
+          echo "================================"
+          echo "SSH TEST PASSED"
+          echo "================================"
