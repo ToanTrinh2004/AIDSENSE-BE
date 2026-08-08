@@ -1,26 +1,4 @@
-name: Test AidSense SSH
-
-on:
-  workflow_dispatch:
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Prepare SSH key
-        run: |
-          printf '%s\n' '${{ secrets.EC2_SSH_KEY }}' > "$RUNNER_TEMP/ec2_key"
-          chmod 600 "$RUNNER_TEMP/ec2_key"
-
-          echo "SSH key fingerprint:"
-          ssh-keygen -lf "$RUNNER_TEMP/ec2_key"
-
-      - name: Test SSH
-        run: |
-          ssh \
-            -o StrictHostKeyChecking=no \
-            -o ConnectTimeout=10 \
-            -i "$RUNNER_TEMP/ec2_key" \
-            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
-            "echo SSH_CONNECTION_SUCCESS && whoami && hostname"
+- name: Show SSH target
+  run: |
+    echo "Host: ${{ secrets.EC2_HOST }}"
+    echo "User: ${{ secrets.EC2_USER }}"
